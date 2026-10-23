@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+.npm-cache/
+.maintenance/
+.mp-rooms-cache.json
+.DS_Store
+*.log
+.env*
+!.env.example

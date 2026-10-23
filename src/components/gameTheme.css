@@ -1,0 +1,104 @@
+/* Shared arcade palette: the menus belong to the same illustrated game. */
+:root { --arcade-ink: #031323; --arcade-panel: #06243f; --arcade-field: #092e4c; --arcade-line: #119bc9; --arcade-cyan: #57e4ff; --arcade-text: #f4fbff; --arcade-muted: #83cbe2; --arcade-lime: #b5f534; }
+.game-menu, .character-studio, .match-overlay { font-family: var(--font-display); color: var(--arcade-text); }
+.game-menu { background: repeating-linear-gradient(140deg, transparent 0 25px, #2ec9ff07 25px 27px), #031c31; }
+.game-menu h1, .game-menu h2, .game-menu h3, .character-studio h1, .character-studio h2 { color: #f4fbff; font-weight: 900; }
+.game-menu .menu-header h1, .studio-header h1 { text-transform: uppercase; letter-spacing: -.035em; text-shadow: 0 3px #001224; }
+.game-menu .menu-header p, .game-menu .menu-section-heading p, .game-menu .menu-setting-row p, .game-menu .custom-card p, .game-menu .custom-card-heading p, .game-menu .custom-room-footer p, .game-menu .custom-checkbox small { color: #83cbe2; }
+.menu-icon-button, .game-menu .menu-ball-skin { border: 1px solid #18a6d2; background: #072e4b; color: #8aeaff; box-shadow: 0 3px 0 #00111e; }
+.menu-icon-button:hover { background: #104566; }
+.game-menu .menu-tabs, .game-menu .menu-footer, .game-menu .custom-profile, .game-menu .custom-room-footer { border-color: #167494; }
+.game-menu .menu-tabs button { color: #85c3dc; }
+.game-menu .menu-tabs button[aria-selected=true] { color: #61e6ff; border-color: #32ddff; }
+.game-menu .menu-settings-card, .game-menu .custom-card { background: #06243f; border: 1.5px solid #168db7; box-shadow: 0 4px 0 #001323; }
+.game-menu .menu-setting-row { border-color: #164660; }
+.game-menu .menu-setting-row h3, .game-menu .match-setup-fields h3, .game-menu .match-setup-fields label { color: #d2f6ff; }
+.game-menu .menu-choices { background: #031d32; border-color: #176688; }
+.game-menu .menu-choices button { color: #b5d8eb; }
+.game-menu .menu-choices button:hover { background: #12425c; }
+.game-menu .menu-choices button[aria-pressed=true] { background: #f5d53b; border-color: #ffea72; color: #06192b; }
+.game-menu .menu-toggle { color: #99d9ec; }
+.game-menu .menu-toggle > span { background: #294f67; }
+.game-menu .menu-toggle[aria-checked=true] > span { background: #77c938; }
+.game-menu .menu-text-input, .game-menu .match-setup select, .game-menu .custom-field select, .game-menu .custom-code-form input { background: #031b30; border-color: #178eb9; color: #e5f8ff; }
+.game-menu select option { background: #07243d; color: #e5f8ff; }
+.game-menu .menu-range input, .game-menu .custom-checkbox input { accent-color: #a9ed31; }
+.game-menu .menu-text-button { color: #83d7ef; }
+.game-menu .menu-primary, .character-studio .menu-primary { background: linear-gradient(#d1ff68, #9cec29); color: #071c26; border: 2px solid #ddff92; font-weight: 900; text-transform: uppercase; box-shadow: 0 4px 0 #254f17, 0 6px 0 #00121e; }
+.game-menu .menu-primary:hover, .character-studio .menu-primary:hover { background: #ceff63; }
+.game-menu .menu-primary:active, .character-studio .menu-primary:active { transform: translateY(2px); box-shadow: 0 2px 0 #254f17; }
+.game-menu .mode-list button { color: #b4d5e7; }
+.game-menu .mode-list button:hover { background: #0c3350; }
+.game-menu .mode-list button[aria-pressed=true] { background: #124663; border-color: #34d9ff; color: #8feaff; }
+.game-menu .menu-map-card { background: #062641; border-color: #136b93; box-shadow: 0 3px 0 #001422; }
+.game-menu .menu-map-card:hover { border-color: #48cce9; }
+.game-menu .menu-map-card[aria-pressed=true] { border-color: #b9f54b; }
+.game-menu .menu-map-image { background: #04213b; }
+.game-menu .menu-map-caption h3 { color: #eefaff; }
+.game-menu .menu-map-caption p { color: #8ac9de; }
+.game-menu .menu-map-check { border-color: #248aab; }
+.game-menu [aria-pressed=true] > .menu-map-caption .menu-map-check { background: #abe931; border-color: #d2fb75; color: #092138; }
+.game-menu .match-setup { background: #072740; border-color: #168db7; box-shadow: 0 4px 0 #001323; }
+.game-menu .custom-profile button, .game-menu .custom-share-code button { color: #c0ecfa; background: #062b48; border-color: #168cb7; }
+.game-menu .custom-profile button[aria-pressed=true] { background: #105141; border-color: #4aa986; }
+.game-menu .custom-connection.is-connected, .game-menu .custom-ready { color: #55ecac; }
+.game-menu .custom-connection { color: #ffd66a; }
+.game-menu .custom-section-icon { background: #063754; border-color: #16c8f2; color: #71e7ff; }
+.game-menu .custom-mode-cards button { background: #092e4a; border-color: #148bb5; color: #92daee; }
+.game-menu .custom-mode-cards button span { color: #f5fbff; font-size: 12px; text-transform: uppercase; }
+.game-menu .custom-mode-cards button[aria-pressed=true] { background: #154940; border: 2px solid #b9ed36; color: #b3e9e8; }
+.game-menu .custom-field, .game-menu .custom-checkbox, .game-menu .custom-code-form label { color: #a9e4f6; }
+.game-menu .custom-code-form input::placeholder { color: #557f9b; }
+.game-menu .custom-public-heading h2 span { background: #073957; color: #6fe4ff; }
+.game-menu .custom-room-list > button { color: #d3f4ff; border-color: #18506c; }
+.game-menu .custom-room-list small { color: #80c4de; }
+.game-menu .custom-empty > svg { color: #198cbb; }
+.game-menu .custom-error { background: #4b2636; border-color: #b4566c; color: #ffd4cf; }
+.game-menu .custom-room-banner { background: #072d49; border: 2px solid #1ac6ed; box-shadow: 0 4px 0 #001323; }
+.game-menu .custom-eyebrow { color: #7cdbf2; }
+.game-menu .custom-share-code code { color: #f4df57; }
+.game-menu .custom-room-summary span, .game-menu .custom-small-badge { color: #7adbf3; }
+.game-menu .custom-leave { background: #3c293b; border-color: #b96375; color: #ffccd4; }
+.game-menu .custom-slot { background: #082f4b; border-color: #1a6988; }
+.game-menu .custom-slot.is-you { background: #104737; border-color: #85d947; }
+.game-menu .custom-slot-meta, .game-menu .custom-slot h3 small { color: #82cfe5; }
+.game-menu .custom-portrait { color: #2b789c; }
+.game-menu .custom-slot-actions button { background: #073552; border-color: #168cac; color: #bdeafa; }
+.game-menu .custom-hero button { background: #0b3450; border-color: #266b88; color: #a0d3e7; }
+.game-menu .custom-hero button[aria-pressed=true] { background: #c2ef46; border-color: #e1ff91; color: #052031; }
+.game-menu button:focus-visible, .game-menu input:focus-visible, .game-menu select:focus-visible, .character-studio button:focus-visible, .character-studio input:focus-visible { outline-color: #67e9ff; }
+.studio-header, .studio-wide .studio-profile, .studio-drawer { background: #06243ff5; border: 1.5px solid #1898c4; color: #eaf9ff; box-shadow: 0 4px 0 #011322; }
+.studio-header p, .studio-profile p, .studio-eyebrow, .studio-profile dt, .studio-selection-title p, .studio-footer > span { color: #87cde4; }
+.studio-profile dl, .studio-footer { border-color: #1b5971; }
+.studio-tabs { background: #031a2e; border-color: #146582; }
+.studio-tabs button { color: #95c8dd; }
+.studio-tabs button[aria-selected=true] { background: #17aed6; color: #031d30; font-weight: 900; }
+.studio-grid button, .studio-head-shapes button { background: #0b3350; border-color: #227396; color: #c4ecf9; }
+.studio-grid button:hover { border-color: #40c9ed; }
+.studio-grid button[aria-pressed=true] { background: #175347; border-color: #b3f143; color: white; }
+.studio-selected, .studio-head-shapes button[aria-pressed=true] { background: #b3f143; color: #062139; border-color: #d0fc6e; }
+
+/* Directional highlights, recessed controls and solid lower edges add depth. */
+.game-menu { background: radial-gradient(ellipse at 12% 0%, #13527377, transparent 52%), radial-gradient(ellipse at 90% 100%, #102f5577, transparent 50%), repeating-linear-gradient(140deg, transparent 0 25px, #5fcfff04 25px 27px), #031a2d; }
+.game-menu .menu-header { padding: 17px 20px; border: 1px solid #3d90aa70; border-radius: 17px; background: linear-gradient(115deg, #17425ad9, #082b43cc 65%); box-shadow: inset 0 1px #b8edff28, 0 4px 0 #001420, 0 12px 24px #00121e35; }
+.game-menu .menu-header h1 { text-shadow: 0 2px #082b41, 0 4px #001420; }
+.game-menu .menu-settings-card, .game-menu .custom-card, .game-menu .match-setup { background: linear-gradient(140deg, #103851, #06233a 65%); border-color: #35829f; box-shadow: inset 0 1px #b9efff30, inset 0 -2px #001b2e, 0 5px 0 #001322, 0 13px 22px #00132045; }
+.game-menu .menu-tabs { gap: 7px; border: 1px solid #23506b; border-radius: 13px; padding: 5px; background: #031728; box-shadow: inset 0 2px 5px #000c1680; }
+.game-menu .menu-tabs button { flex: 1; border: 1px solid transparent; border-radius: 9px; padding: 12px 8px; }
+.game-menu .menu-tabs button[aria-selected=true] { color: #d8faff; border-color: #448eaa; background: linear-gradient(#205574, #133d56); box-shadow: inset 0 1px #a1e6f940, 0 3px #001321; }
+.game-menu .menu-choices, .game-menu .match-setup .menu-choices { background: #041a2c; box-shadow: inset 0 2px 4px #00121d; border-color: #204e68; }
+.game-menu .menu-choices button[aria-pressed=true] { background: linear-gradient(#ffe67e, #d8ad26); border-color: #ffea8a; box-shadow: inset 0 1px #fff4bd, 0 2px #71551d; }
+.game-menu .mode-list button { border: 1px solid #204c68; background: linear-gradient(#12354b, #09283e); box-shadow: inset 0 1px #89c8df17, 0 3px #001420; margin-bottom: 4px; }
+.game-menu .mode-list button[aria-pressed=true] { border-color: #50b8d0; background: linear-gradient(120deg, #28627d, #15465c); color: #defaff; box-shadow: inset 4px 0 #c6eb62, inset 0 1px #a8e9fb44, 0 3px #001420; }
+.game-menu .menu-map-card { background: linear-gradient(#133a50, #06273c); border-color: #387996; box-shadow: inset 0 1px #a1d8ee38, 0 5px #001320, 0 12px 16px #00132255; transition: border-color .15s, transform .15s; }
+.game-menu .menu-map-card[aria-pressed=true] { border-color: #c5ed64; box-shadow: inset 0 1px #e6ffb6, 0 5px #2b4a20, 0 13px 20px #00132066; }
+.game-menu .menu-map-image { border-bottom: 1px solid #4c94ac; box-shadow: inset 0 2px 6px #001a32; }
+.game-menu .menu-map-caption { background: linear-gradient(#17435a90, #08273d); border-top: 1px solid #9dddff20; }
+.game-menu .menu-map-card:hover { transform: translateY(-2px); }
+.game-menu .custom-slot { background: linear-gradient(145deg, #123e58, #092b42); box-shadow: inset 0 1px #a6e9ff22, 0 3px #001b2e; }
+.game-menu .custom-slot.is-you { background: linear-gradient(140deg, #245c47, #123e35); box-shadow: inset 0 1px #daffad44, 0 3px #102b22; }
+.game-menu .custom-room-identity { background: linear-gradient(110deg, #164e68, #092b45); box-shadow: inset 0 1px #95e9ff44, 0 4px #001623, 0 10px 20px #00152755; }
+.game-menu .menu-text-input, .game-menu select, .game-menu .custom-code-form input { box-shadow: inset 0 2px 5px #00111f, 0 1px #91d9ef1a; }
+.game-menu .menu-footer { padding-bottom: 4px; }
+@media (max-width: 760px) { .game-menu .menu-header { padding: 12px; } .game-menu .menu-tabs { gap: 3px; } .game-menu .menu-tabs button { font-size: 10px; padding-inline: 5px; } }
+@media (prefers-reduced-motion: reduce) { .game-menu .menu-map-card { transition: none; } .game-menu .menu-map-card:hover { transform: none; } }

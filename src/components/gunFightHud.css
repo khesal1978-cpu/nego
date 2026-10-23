@@ -1,0 +1,5 @@
+.gun-score { display: flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #ffffff26; border-radius: 10px; background: #203039c7; color: #f2f4f2; font: 700 13px 'Plus Jakarta Sans', sans-serif; font-variant-numeric: tabular-nums; }
+.gun-score i { height: 12px; width: 1px; margin: 0 2px; background: #ffffff36; }
+.gun-score svg { opacity: .75; }
+.gun-score-urgent { color: #f0b6a8; }
+@media (max-width: 380px) { .gun-score { gap: 5px; padding-inline: 8px; font-size: 12px; } }

@@ -1,0 +1,27 @@
+:root {
+  --fullscreen-size: 52px;
+  --fullscreen-top: max(8px, env(safe-area-inset-top));
+  --fullscreen-right: max(10px, env(safe-area-inset-right));
+  --fullscreen-reserve: calc(var(--fullscreen-size) + 12px);
+}
+.fullscreen-control { position: fixed; z-index: 1100; top: var(--fullscreen-top); right: var(--fullscreen-right); color: #edfbff; font-family: var(--font-sans); }
+.fullscreen-button { display: grid; place-items: center; width: var(--fullscreen-size); height: var(--fullscreen-size); padding: 0; border: 1px solid #75d9f580; border-radius: 13px; background: #05233bed; color: #b3edff; box-shadow: 0 3px 0 #001321; cursor: pointer; touch-action: manipulation; -webkit-touch-callout: none; }
+.fullscreen-button svg { width: 20px; height: 20px; }
+.fullscreen-button:hover, .fullscreen-button[aria-expanded=true] { background: #0b4260; color: white; }
+.fullscreen-button:disabled { opacity: .6; }
+.fullscreen-button { transition: opacity .25s ease; }
+.fullscreen-control[data-visible=false] .fullscreen-button { opacity: 0; }
+.fullscreen-control button:focus-visible { outline: 2px solid #c3f951; outline-offset: 3px; }
+.fullscreen-options { position: absolute; right: 0; top: calc(var(--fullscreen-size) + 10px); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 180px; padding: 12px; border: 1px solid #4bbbd580; border-radius: 12px; background: #051e33; box-shadow: 0 8px 28px #0008; }
+.fullscreen-options > span { grid-column: 1 / -1; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.fullscreen-options button { min-height: 44px; border: 1px solid #276782; border-radius: 8px; background: #0b344d; color: #e7faff; font: 800 13px var(--font-sans); cursor: pointer; }
+.fullscreen-options button[aria-pressed=true] { background: #b6ed45; color: #082536; border-color: #daff92; }
+.fullscreen-message { position: absolute; right: 0; top: calc(var(--fullscreen-size) + 8px); width: min(270px, calc(100vw - 30px)); margin: 0; padding: 12px; background: #051e33; border: 1px solid #4bbbd580; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+.fullscreen-install { position: absolute; right: 0; top: calc(var(--fullscreen-size) + 8px); width: min(330px, calc(100vw - 28px)); max-height: calc(var(--app-height, 100dvh) - var(--fullscreen-size) - 30px); overflow-y: auto; overscroll-behavior: contain; padding: 14px; background: #051e33; border: 1px solid #4bbbd580; border-radius: 14px; box-shadow: 0 10px 32px #0008; font-size: 12px; line-height: 1.5; }
+.fullscreen-install header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fullscreen-install header button { flex-shrink: 0; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #4bbbd566; border-radius: 8px; background: #103750; color: #efffff; cursor: pointer; }
+.fullscreen-install p { color: #b4d4e2; margin: 8px 0; }
+.fullscreen-install ol { padding-left: 19px; margin: 10px 0; }
+.fullscreen-install li { margin-block: 7px; }
+.fullscreen-install li svg { display: inline; vertical-align: text-bottom; }
+.fullscreen-install small { color: #a5c99c; }

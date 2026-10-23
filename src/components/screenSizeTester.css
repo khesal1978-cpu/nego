@@ -1,0 +1,17 @@
+.screen-tester { position: fixed; inset: 0; display: flex; flex-direction: column; background: #070d15; color: #e1eaf2; padding: 18px; font: 13px var(--font-sans); overflow: auto; }
+.screen-tester header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.screen-tester h1 { margin: 0 0 5px; font: 700 22px var(--font-display); }
+.screen-tester p { margin: 0; color: #91a6b6; }
+.screen-tester a { color: #c4e69b; }
+.screen-tester-controls { flex-shrink: 0; }
+.screen-tester-presets, .screen-tester-custom { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.screen-tester button { background: #142636; border: 1px solid #345168; color: #d5e4ef; border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+.screen-tester button[aria-pressed=true] { border-color: #b4d889; color: #d9f6b4; background: #273a29; }
+.screen-tester small { display: block; color: #8fa6b9; margin-top: 4px; }
+.screen-tester label { display: flex; gap: 7px; align-items: center; }
+.screen-tester input[type=number] { width: 78px; background: #0d1d2b; border: 1px solid #345168; color: white; padding: 8px; border-radius: 6px; }
+.screen-tester-check { padding: 8px; }
+.screen-tester output { color: #8ea4b5; margin-left: auto; }
+.screen-tester-stage { flex: 1; min-height: 240px; display: grid; place-items: center; background: #0c1520; border: 1px solid #243748; border-radius: 12px; overflow: hidden; }
+.screen-tester-stage > div { position: relative; box-shadow: 0 10px 45px #0008; }
+.screen-tester iframe { display: block; border: 0; transform-origin: top left; background: black; max-width: none; }

@@ -1,0 +1,43 @@
+/* Keep the existing navy/lime game identity, with quieter surfaces and a
+   consistent touch target across menus and all landscape sizes. */
+:root { color-scheme: dark; }
+html, body, #root { width: 100%; height: 100%; min-height: 100%; margin: 0; overscroll-behavior: none; }
+button, input, select { -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+.title-screen { padding-top: max(14px, env(safe-area-inset-top)); padding-bottom: max(14px, env(safe-area-inset-bottom)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); animation: panel-arrive 180ms ease-out both; }
+.title-screen button { transition-property: transform, background-color, border-color; transition-duration: 140ms; }
+.gameplay-hud.safe-pad { padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.gameplay-hud button { min-width: 42px; min-height: 42px; border-radius: 11px; border-color: #91bdcc40; background: #092538e0; box-shadow: inset 0 1px #d8f5ff10, 0 2px 4px #00131f33; backdrop-filter: none; }
+.gameplay-hud button svg { width: 17px; height: 17px; stroke-width: 1.9; }
+.gameplay-hud button:focus-visible { outline: 2px solid #d2ed9c; outline-offset: 2px; }
+.character-portrait-svg { filter: drop-shadow(0 2px 2px #04121f44); shape-rendering: geometricPrecision; }
+.character-portrait-svg path, .character-portrait-svg ellipse { stroke-linecap: round; stroke-linejoin: round; }
+.character-studio .studio-header, .character-studio .studio-drawer, .custom-menu .custom-card { border-color: #59869b66; box-shadow: inset 0 1px #c1e7ef18, 0 4px 0 #031b2a; }
+.character-studio .studio-grid button { border-width: 1px; box-shadow: inset 0 1px #c1e7ef0c; }
+.character-studio .studio-grid button[aria-pressed=true] { border-color: #c4dd94; background: #244333; padding: 10px 4px 8px; }
+.custom-menu .custom-slot { border-color: #5b82955c; border-radius: 14px; }
+.custom-menu .custom-slot.is-you { border-color: #aac77b70; }
+.custom-menu .custom-slot-actions button { min-height: 36px; }
+@media (orientation: landscape) and (max-height: 540px) { .character-studio .studio-layout { flex-direction: row; align-items: stretch; min-height: 0; } .character-studio .studio-profile { display: none; } .character-studio .studio-preview-space { flex: 1; min-height: 0; } .character-studio .studio-drawer { flex: 0 1 48%; max-height: 100%; } .character-studio .studio-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .character-studio .studio-header p { display: none; } .custom-menu .custom-entry-layout, .custom-menu .custom-room-layout { grid-template-columns: minmax(0, 1fr) minmax(220px, .8fr); gap: 12px; } .custom-menu .custom-card { padding: 14px; } .custom-menu .custom-room-footer { padding-top: 9px; } .custom-menu .custom-room-footer p { display: none; } }
+.game-menu, .character-studio { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.game-menu, .character-studio, .match-panel, .custom-room { animation: panel-arrive 180ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes panel-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.game-menu button, .character-studio button, .custom-room button { transition: background-color 140ms, border-color 140ms, transform 140ms; }
+.game-menu button:active, .character-studio button:active { transform: translateY(1px); }
+.game-menu button:focus-visible, .character-studio button:focus-visible, .custom-room button:focus-visible { outline: 2px solid #c4e79a; outline-offset: 3px; }
+.game-menu .menu-icon-button, .character-studio .studio-icon-button { min-width: 44px; min-height: 44px; }
+.game-menu .menu-tabs button, .game-menu .menu-choices button, .menu-toggle { min-height: 40px; }
+.game-menu .menu-header, .game-menu .match-setup, .game-menu .menu-settings-card { border-color: #51869d66; }
+.game-menu .menu-map-card { border-width: 1px; border-color: #4b799066; box-shadow: inset 0 1px #ffffff0c, 0 4px 0 #001a2b; }
+.game-menu .menu-map-card[aria-pressed="true"] { border-color: #bedb80; box-shadow: inset 0 0 0 1px #bedb8077, 0 4px 0 #152d29; }
+.game-menu .menu-map-image { aspect-ratio: 16 / 10; }
+.game-menu .menu-map-caption h3 { line-height: 1.35; }
+.game-menu svg.lucide, .match-overlay svg.lucide, .character-studio svg.lucide { stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.game-menu .menu-scroll, .mode-list, .map-selection, .match-setup, .result-content { scrollbar-width: thin; scrollbar-color: #456c80 transparent; }
+.gun-score { height: 36px; border-color: #83bbce38; border-radius: 11px; background: #082539e8; box-shadow: inset 0 1px #d8f5ff12, 0 2px 4px #00131f38; }
+.nuke-crosshair { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%); color: #f4fafb; pointer-events: none; filter: drop-shadow(0 1px 1px #05121ee6); opacity: .9; }
+.nuke-crosshair svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; }
+.nuke-crosshair[data-target="true"] { color: #d4ef9a; }
+.nuke-crosshair[data-ready="false"] { opacity: .42; }
+@media (orientation: landscape) and (max-height: 540px) { .game-menu, .character-studio { padding-block: max(10px, env(safe-area-inset-top)); } .game-menu .menu-header { margin-bottom: 10px; padding-block: 8px; } .game-menu .menu-header p { display: none; } .game-menu .modes-layout { display: grid; grid-template-columns: 116px minmax(180px, 1fr) minmax(175px, .65fr); gap: 12px; overflow: hidden; } .game-menu .mode-list { flex-direction: column; overflow-y: auto; } .game-menu .map-selection { overflow-y: auto; } .game-menu .match-setup { max-height: 100%; overflow-y: auto; padding: 13px; } .game-menu .match-setup-fields { grid-template-columns: 1fr; gap: 13px; } .game-menu .map-grid { gap: 10px; } .game-menu .menu-tabs { gap: 7px; } .game-menu .menu-scroll { padding-block: 10px; } }
+@media (prefers-reduced-motion: reduce) { .game-menu, .character-studio, .match-panel, .custom-room { animation: none; } .game-menu button, .character-studio button { transition: none; } }

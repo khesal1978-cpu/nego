@@ -1,0 +1,17 @@
+.settings-menu .game-info { max-width: 820px; margin: 0 auto; color: #2f454c; }
+.settings-menu .game-credit { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 20px; border: 1px solid #35829f; border-radius: 16px; background: linear-gradient(135deg, #113c54, #061f34); color: #c9e7f5; }
+.settings-menu .game-credit > div > span { color: #b9ec82; font-size: 10px; letter-spacing: .17em; font-weight: 800; }
+.settings-menu .game-credit h2 { margin: 6px 0; font-size: 23px; }
+.settings-menu .game-credit p { margin: 0; font-size: 12px; color: #8cc4dc; }
+.settings-menu .game-credit a { display: inline-flex; align-items: center; gap: 9px; padding: 12px 15px; min-height: 44px; border: 1px solid #578ca8; border-radius: 11px; color: #f5fbff; background: #113f59; text-decoration: none; font-weight: 800; font-size: 13px; }
+.settings-menu .game-credit a:hover { background: #195472; }
+.settings-menu .game-privacy { padding: 23px 2px 12px; }
+.settings-menu .game-privacy header { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.settings-menu .game-privacy h2 { font-size: 23px; margin: 0; }
+.settings-menu .game-privacy header p { font-size: 11px; color: #50676c; margin: 5px 0 12px; }
+.settings-menu .game-privacy h3 { font-size: 14px; margin: 20px 0 6px; }
+.settings-menu .game-privacy p { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; line-height: 1.8; margin: 7px 0; color: #415d61; }
+.settings-menu .game-privacy header a { display: grid; place-items: center; width: 40px; height: 40px; color: #315a67; border: 1px solid #748e91; border-radius: 9px; flex-shrink: 0; }
+.settings-menu .game-info a:focus-visible { outline: 2px solid #426b71; outline-offset: 3px; }
+.settings-menu .game-credit a:focus-visible { outline-color: #c7f48a; }
+@media (max-height: 500px) { .settings-menu .game-credit { padding: 14px; }.settings-menu .game-credit h2, .settings-menu .game-privacy h2 { font-size: 19px; }.settings-menu .game-privacy { padding-top: 18px; } }

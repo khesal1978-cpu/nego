@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: sixzun-multiplayer
+    runtime: node
+    region: singapore
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --legacy-peer-deps && npm run build:server
+    startCommand: npm run start:server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_FRONTEND
+        value: "false"
+      - key: ROOM_CACHE_ENABLED
+        value: "false"
+      - key: ENABLE_PUBLIC_MQTT
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: CLOUDFLARE_TURN_KEY_ID
+        sync: false
+      - key: CLOUDFLARE_TURN_API_TOKEN
+        sync: false
