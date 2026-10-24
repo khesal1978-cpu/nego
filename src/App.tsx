@@ -962,7 +962,6 @@ export function App() {
 
   // Connect & Subscribe to Real-Time WebSocket Multiplayer + Voice Chat Server
   useEffect(() => {
-    multiplayerClient.connect();
     let previousRoomStatus = multiplayerClient.currentRoom?.status;
     const unsubState = multiplayerClient.subscribe(() => {
       const status = multiplayerClient.currentRoom?.status;
@@ -1055,6 +1054,12 @@ export function App() {
       unsubMatchStart();
     };
   }, []);
+
+  // Solo play and ordinary menus do not open a multiplayer connection.
+  useEffect(() => {
+    if (gameState === 'CUSTOM_LOBBY' || mpRoom?.code) multiplayerClient.connect();
+    else multiplayerClient.disconnectWhenIdle();
+  }, [gameState, mpRoom?.code]);
 
   // Keep player's profile synced with the real-time server whenever name, character, outfit, or face changes
   useEffect(() => {
@@ -1992,7 +1997,7 @@ export function App() {
                     </span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#062C24] border border-emerald-400/50 font-display text-[8px] sm:text-[9px] font-black text-emerald-300 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {mpRoom ? mpRoom.code : `${mpOnlineCount} ONLINE`}
+                      {mpRoom ? mpRoom.code : mpConnected ? `${mpOnlineCount} ONLINE` : 'PLAY WITH FRIENDS'}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-[#091E38] border border-[#38BDF8]/35 font-display text-[8px] font-black uppercase text-[#FACC15] shrink-0">

@@ -31,7 +31,7 @@ const memoryFs = { existsSync: () => false, writeFileSync() {}, readFileSync: ()
 function load(entry, mocks = {}, extra = {}, options = {}) {
   const output = buildSync({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', write: false, packages: 'external', loader: { '.css': 'empty' }, define: { 'import.meta.url': JSON.stringify(pathToFileURL(resolve(entry)).href) }, ...options }).outputFiles[0].text;
   const exports = {};
-  const context = vm.createContext({ exports, module: { exports }, require: name => name in mocks ? mocks[name] : require(name), console, Buffer, URL, URLSearchParams, AbortSignal, Date: TestDate, setInterval: callback => { intervals.push(callback); return { unref() {} }; }, clearInterval() {}, setTimeout, clearTimeout, ...extra });
+  const context = vm.createContext({ exports, module: { exports }, require: name => name in mocks ? mocks[name] : require(name), console, Buffer, URL, URLSearchParams, AbortSignal, structuredClone, Date: TestDate, setInterval: callback => { intervals.push(callback); return { unref() {} }; }, clearInterval() {}, setTimeout, clearTimeout, ...extra });
   vm.runInContext(output, context, { filename: entry });
   return { exports: context.module.exports, context };
 }
@@ -244,3 +244,19 @@ assert.equal(iceConfig.iceServers[0].username, 'refreshed'); assert.equal(restar
 host.cleanupVoicePeers();
 assert.equal(host.iceRefreshTimer, null); assert.equal(host.peerConnections.size, 0);
 console.log('PASS: live ICE configuration, connecting-peer restart, connected-peer refresh and room cleanup.');
+
+const idle = new host.constructor();
+const beforeIdle = requests.length;
+idle.syncProfile('Solo', 'green_hoodie', 'crown_hoodie', 'happy_laugh');
+await idle.refreshStateHttp();
+assert.equal(requests.length, beforeIdle, 'Solo profile and refresh do not contact multiplayer');
+assert.equal(idle.ws, null); assert.equal(idle.pendingWsQueue.length, 0);
+idle.connect(); await new Promise(resolve => setTimeout(resolve, 10));
+assert(idle.connected, 'Entering multiplayer opens the connection');
+idle.currentRoom = { code: 'KEEP' }; idle.disconnectWhenIdle();
+assert(idle.connected, 'Match and lobby membership keep the connection');
+idle.currentRoom = null; idle.disconnectWhenIdle();
+assert.equal(idle.ws, null); assert.equal(idle.pollTimer, null); assert.equal(idle.reconnectTimer, null);
+const afterDisconnect = requests.length;
+await idle.refreshStateHttp(); assert.equal(requests.length, afterDisconnect);
+console.log('PASS: solo stays offline; multiplayer opens on demand and stops polling/reconnecting after leaving.');

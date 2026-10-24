@@ -4,6 +4,13 @@
   "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "regions": ["bom1"],
+  "functions": { "api/multiplayer.ts": { "maxDuration": 300 } },
+  "rewrites": [
+    { "source": "/api/mp/:path*", "destination": "/api/multiplayer?route=/api/mp/:path*" },
+    { "source": "/api/health", "destination": "/api/multiplayer?route=/api/health" },
+    { "source": "/ws", "destination": "/api/multiplayer?socket=1" }
+  ],
   "headers": [
     { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
     { "source": "/(.*)", "headers": [

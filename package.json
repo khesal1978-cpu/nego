@@ -29,7 +29,8 @@
     "test:saved-quality-audio": "node scripts/test-saved-quality-audio.mjs",
     "test:custom-volleyball": "node scripts/test-custom-volleyball.mjs",
     "test:low-end": "node scripts/test-low-end.mjs",
-    "test:deployment": "node scripts/test-deployment.mjs"
+    "test:deployment": "node scripts/test-deployment.mjs",
+    "test:vercel": "node scripts/test-vercel.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

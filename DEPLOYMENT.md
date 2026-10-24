@@ -1,55 +1,59 @@
-# Deploy SIXZUN
+# Deploy SIXZUN on Vercel
 
-Use **Vercel for the game**, **one always-on Render server in Singapore for rooms/WebSockets**, and **Cloudflare TURN for WebRTC connections that need a relay**. The repository is prepared; no hosted service has been created or paid for.
+The game and multiplayer endpoint run in **one Vercel project**, with **Upstash Redis** for temporary room state and events shared between function instances. Leave `VITE_MULTIPLAYER_URL` empty. This setup does not require a Render service.
 
-Vercel Functions now support WebSockets, but connections have instance-duration limits and reconnects can reach a different instance. This game's room state lives in memory. A single persistent backend fits the current design without adding a shared database/pub/sub system. Direct WebRTC carries movement when available; the backend remains the fallback and room coordinator. TURN improves connectivity on restrictive networks, but does not guarantee low latency on every connection.
+The repository contains the integration. A real Redis database, its Vercel connection and the hosted deployment still need to be configured. Building succeeds without Redis; solo play works, while online room actions show a setup message until storage is connected.
 
-## 1. Create the relay credentials
+## Connect the project and free storage
 
-In Cloudflare Realtime TURN, create a TURN key and its API token. Keep both for Render:
+1. Push the updated source to the repository already configured as `origin`. Include `api/`, `server/`, `src/`, `scripts/`, `public/` and the root configuration files. Exclude `.env`, caches, `node_modules`, `dist`, `build` and `.maintenance` as specified in `.gitignore`.
+2. Import or open that repository in Vercel. Use **Vite**, the repository root, **Node 22.x**, and **Fluid compute**. `vercel.json` supplies the install/build commands, `dist` output, Mumbai (`bom1`) region and a 300-second multiplayer function duration.
+3. In the project's **Storage** area, connect **Upstash Redis** through the Marketplace. Select the **Free / $0** plan and a nearby available primary region. Review the displayed plan before creating the database; do not select a paid upgrade.
+4. Connect the database to the intended Vercel environments. The backend accepts either `UPSTASH_REDIS_REST_URL` with `UPSTASH_REDIS_REST_TOKEN`, or the Marketplace's `KV_REST_API_URL` with `KV_REST_API_TOKEN`. These must be server environment variables, never `VITE_` variables or committed files. A read-only token cannot update rooms.
+5. Remove any old `VITE_MULTIPLAYER_URL` value pointing to an external backend. Keep `VITE_ENABLE_PUBLIC_MQTT=false`. Same-origin requests work automatically; `ALLOWED_ORIGINS` is optional for additional exact origins, comma-separated. No wildcard is needed.
+6. Redeploy after attaching storage or changing variables. Open `/api/health` on the deployment and confirm HTTP 200 with `status: "ok"` and `storage: "redis"`. A 503 with `setup_required` means credentials are absent; `unavailable` means Redis cannot be reached or its limits were reached.
+
+The default Redis namespace isolates the Vercel project and Production/Preview/Development environments. Set `REDIS_NAMESPACE` only when deliberately choosing a shared namespace; avoid pointing a test deployment at production room data. Preview deployments within the same environment can share rooms, so reload all test players onto the same release.
+
+The game is at `/`, its standalone policy is at `/privacy.html`, and **Settings → About** contains the policy and ArsDev YouTube credit. Browser saves remain tied to the browser and website origin.
+
+## What uses the free quota
+
+Upstash's published Free plan is **$0**, with **250 MB storage, 500,000 commands/month and 10 GB monthly bandwidth**, checked 24 October 2026. Vercel has its own usage limits. Verify the plan shown in the dashboard; adding a card or selecting another plan may change billing. [Upstash pricing](https://upstash.com/pricing/redis).
+
+Solo/bot matches and ordinary menus do not open multiplayer connections. Online room controls persist authoritative state with an atomic compare-and-set, so simultaneous joins cannot overwrite each other. Presence writes are batched per active instance every 25 seconds. Direct WebRTC carries gameplay when available; fallback to players on another instance uses batched Redis pub/sub and can consume quota much faster. HTTP polling also consumes reads when WebSockets are unavailable.
+
+The command quota measures operations across the month, **not total users or simultaneous players**. No 500–1,000 concurrent-player capacity has been measured. The current shared lobby document has defensive bounds of 150 rooms and 750 client records, which are implementation limits rather than tested capacity. Load testing and dashboard usage measurements are required before increasing these bounds or advertising a player count.
+
+## Optional connection relay
+
+Direct peer connections use STUN by default. For networks that require TURN, configure Cloudflare Realtime TURN on the Vercel server:
 
 ```text
-CLOUDFLARE_TURN_KEY_ID=<your TURN key ID>
-CLOUDFLARE_TURN_API_TOKEN=<your TURN API token>
+CLOUDFLARE_TURN_KEY_ID=<TURN key ID>
+CLOUDFLARE_TURN_API_TOKEN=<TURN API token>
 ```
 
-These are backend secrets. Never place the API token in source control or any `VITE_` variable. The server supplies room participants with short-lived ICE credentials, caches them and refreshes them before expiry. Without valid credentials, rooms still use WebSocket fallback and direct STUN connectivity, but TURN is unavailable. Review Cloudflare's current usage/billing terms.
+Keep both secrets server-side. Room participants receive cached, short-lived ICE credentials. Without TURN the WebSocket fallback remains available, but cross-instance fallback uses Redis quota. TURN has separate provider usage/billing terms and is optional; no TURN service is provisioned by the code.
 
-## 2. Deploy the multiplayer server
+## Verify before sharing
 
-1. Push this project to your repository, excluding `.env`, `.npm-cache`, `node_modules`, `dist`, `build`, `.maintenance` and attachments. Review `.gitignore` first.
-2. Create a Render Blueprint from the repository and select `render.yaml`.
-3. The blueprint selects **Singapore, Starter, one instance**. Starter is paid; review Render's displayed price before creating the service. A sleeping free instance is unsuitable for reliable live rooms.
-4. Set the two Cloudflare variables above. Set `ALLOWED_ORIGINS` to your intended Vercel production origin, for example `https://sixzun-example.vercel.app`. Use the actual domain assigned to your project.
-5. The blueprint builds with `npm ci --legacy-peer-deps && npm run build:server` and starts with `npm run start:server`. It disables frontend serving, disk room caching and the legacy public MQTT broker. Render supplies `PORT`; Node 22 is declared in `package.json`.
-6. Copy the server's HTTPS origin, such as `https://sixzun-multiplayer-example.onrender.com`. Visit `/api/health` there and confirm `status: "ok"`.
+1. Open the same release on two devices, preferably Wi-Fi and mobile data. Check `/api/health` and create/join the same custom room.
+2. Test Volleyball 1v1 and 2v2, Gun Fight and Nuke: ready/start, movement/actions, results, Back to room and a second match. Check both host and guest.
+3. Keep a match open beyond five minutes. Vercel closes sockets at the configured function-duration limit; the client reconnects and shared storage restores room membership. Confirm play recovers on the hosted deployment.
+4. Try voice opt-in and a Wi-Fi/mobile-data switch. Check `/ws` on the game domain and watch for CORS, connection and storage errors.
+5. Check Settings → About, `/privacy.html`, saves after reopening, and iPhone Share → Add to Home Screen. Measure real phone FPS/latency and Redis/Vercel usage before broad sharing.
 
-## 3. Deploy the game on Vercel
+Local verification: `npm run lint`, `npm run test:vercel`, `npm run test:deployment`, `npm run test:multiplayer`, `npm run test:custom-volleyball`, `npm run build:server`, and `npm run build`. The Vercel tests use actual local HTTP, WebSockets and streaming fetch against a disposable Redis emulator; they do not prove hosted routing, provider credentials, load capacity or physical-device performance.
 
-1. Import the same repository. Framework: **Vite**. Root: the project root. Node: **22.x**.
-2. Set `VITE_MULTIPLAYER_URL` to the Render HTTPS origin, with no `/ws`, API path, credentials, query or fragment. Set it for Production and any Preview environments you will use.
-3. Leave `VITE_ENABLE_PUBLIC_MQTT=false`. No Cloudflare API token belongs on Vercel's client environment.
-4. Deploy. `vercel.json` selects `npm ci --legacy-peer-deps`, `npm run build`, and output directory `dist`. A Vercel build without `VITE_MULTIPLAYER_URL` fails with an explicit setup message.
-5. Update Render's `ALLOWED_ORIGINS` to the exact final Vercel origin. Multiple origins are comma-separated. Add custom domains or individual preview origins explicitly; do not use a wildcard. Changing backend origins requires a fresh Vercel build.
+## Operational behavior
 
-The game is at `/`; the standalone policy is at `/privacy.html`. **Settings → About** contains the policy and the ArsDev YouTube credit. Saved profiles/tutorial progress remain tied to the browser and stable website origin. They cannot migrate automatically from a temporary tunnel domain.
+Abandoned clients expire after 90 seconds and are removed during the next state update. The shared room document expires after two hours without a write. Redis keeps active rooms across function restarts; it does not preserve a room after storage expires. Gameplay scores remain host-owned, so a disconnected match host can interrupt the match even while membership survives. Player IDs are temporary, not authenticated accounts, and this casual-game setup is not an anti-cheat service.
 
-## 4. Verify before sharing
+`server.ts` and the existing `render.yaml` remain available for optional standalone hosting and local development. Only that alternate setup uses `VITE_MULTIPLAYER_URL`, exact-origin allowlisting, and an always-on server. It is not part of the Vercel + Redis setup above.
 
-- Open the Vercel link on two devices, ideally one Wi-Fi and one mobile-data connection. Both players should reload the same release.
-- Create and join a custom room, ready/start, move/hit, finish, return to the room and start again. Check both volleyball formats plus Gun Fight and Nuke.
-- Try opt-in voice and a Wi-Fi/mobile-data switch. Network delay, packet loss, browser suspension and relay distance still affect matches; actual phones must be tested.
-- Confirm the browser connects to the Render `/ws` URL, with no CORS/mixed-content errors. A 403 usually means the exact frontend origin is absent from `ALLOWED_ORIGINS`.
-- Verify Settings → About, `/privacy.html`, saved appearance/tutorials after reopening, and iPhone Share → Add to Home Screen behavior. The iPhone browser cannot guarantee native fullscreen on every OS version.
+## References
 
-Local checks: `npm run lint`, `npm run test:deployment`, `npm run test:multiplayer`, `npm run test:custom-volleyball`, `npm run test:low-end`, `npm run build:server`, `npm run build`. The deployment tests exercise local HTTP/CORS/WebSocket behavior and mocked TURN; they do not use live provider credentials or measure mobile GPU FPS.
-
-## Operational limits
-
-Keep **one backend instance**. Restarting/redeploying it clears in-memory rooms; disconnected clients reconnect, but an old room may need recreating. Browser saves stay intact. Horizontal scaling requires shared room state/routing first. Room members use temporary player IDs rather than authenticated accounts; this is a casual-game deployment, not an anti-cheat or abuse-proof service. Monitor server resource use and TURN usage before broad promotion.
-
-## Provider references
-
-- [Vercel WebSockets](https://vercel.com/docs/functions/websockets)
-- [Render WebSockets](https://render.com/docs/websocket) and [regions](https://render.com/docs/regions)
+- [Vercel WebSockets, server exports and reconnect behavior](https://vercel.com/docs/functions/websockets)
+- [Upstash Redis pricing](https://upstash.com/pricing/redis)
 - [Cloudflare TURN credential generation](https://developers.cloudflare.com/realtime/turn/generate-credentials/)

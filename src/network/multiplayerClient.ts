@@ -103,6 +103,8 @@ export function mergeClientRooms(local: CustomRoomInfo | null | undefined, incom
 
 class MultiplayerClientManager {
   private ws: WebSocket | null = null;
+  private networkEnabled = false;
+  private networkEpoch = 0;
   private mqttClient: MqttClient | null = null;
   private subscribedFastRoomCode: string | null = null;
   private broadcastChan: BroadcastChannel | null = null;
@@ -399,6 +401,7 @@ class MultiplayerClientManager {
   }
 
   public connect() {
+    if (!this.networkEnabled) { this.networkEnabled = true; this.networkEpoch++; }
     this.startPollingFallback();
 
     if (
@@ -415,6 +418,7 @@ class MultiplayerClientManager {
       this.ws = ws;
 
       ws.onopen = () => {
+        if (!this.networkEnabled || this.ws !== ws) { ws.close(); return; }
         this.connected = true;
         this.send({
           type: 'player:identify',
@@ -435,6 +439,7 @@ class MultiplayerClientManager {
       };
 
       ws.onmessage = (ev) => {
+        if (!this.networkEnabled || this.ws !== ws) return;
         try {
           const msg = JSON.parse(ev.data);
           this.handleMessage(msg);
@@ -444,6 +449,8 @@ class MultiplayerClientManager {
       };
 
       ws.onclose = () => {
+        if (!this.networkEnabled || this.ws !== ws) return;
+        this.ws = null;
         this.connected = false;
         this.notifyState();
         if (this.reconnectTimer === null) {
@@ -462,6 +469,17 @@ class MultiplayerClientManager {
     }
   }
 
+  public disconnectWhenIdle() {
+    if (this.currentRoom || !this.networkEnabled) return;
+    this.networkEnabled = false; this.networkEpoch++;
+    if (this.reconnectTimer !== null) window.clearTimeout(this.reconnectTimer);
+    if (this.pollTimer !== null) window.clearInterval(this.pollTimer);
+    this.reconnectTimer = null; this.pollTimer = null;
+    const socket = this.ws; this.ws = null; socket?.close();
+    this.pendingWsQueue = []; this.connected = false;
+    this.cleanupVoicePeers(); this.notifyState();
+  }
+
   private startPollingFallback() {
     if (this.pollTimer !== null || typeof window === 'undefined') return;
     this.refreshStateHttp();
@@ -471,6 +489,8 @@ class MultiplayerClientManager {
   }
 
   public async refreshStateHttp() {
+    if (!this.networkEnabled) return;
+    const epoch = this.networkEpoch;
     try {
       const params = new URLSearchParams({
         playerId: this.playerId,
@@ -480,6 +500,7 @@ class MultiplayerClientManager {
       const res = await fetch(multiplayerApi(`/api/mp/state?${params.toString()}`), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) return;
       const data = await res.json();
+      if (!this.networkEnabled || epoch !== this.networkEpoch) return;
       if (Array.isArray(data.rooms)) {
         this.publicRooms = data.rooms;
         this.rebuildPublicRoomsFromKnown();
@@ -579,6 +600,7 @@ class MultiplayerClientManager {
   }
 
   public send(payload: Record<string, any>) {
+    if (!this.networkEnabled) return;
     // Movement and voice must never sit behind an ever-growing WebSocket queue.
     const replaceableState = payload.type === 'game:event' && String(payload.eventKind).endsWith(':state') && payload.payload?.matchEnded !== true;
     if ((payload.type === 'game:player_state' || payload.type === 'voice:audio_chunk' || replaceableState) && (this.ws?.bufferedAmount || 0) > MAX_REALTIME_BUFFER) return;
@@ -628,6 +650,7 @@ class MultiplayerClientManager {
   }
 
   private async roomRequest(path: string, payload: Record<string, unknown> = {}, enter = false) {
+    if (enter) this.connect();
     this.lastError = null;
     this.notifyState();
     try {
