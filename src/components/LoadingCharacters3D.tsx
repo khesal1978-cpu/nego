@@ -141,6 +141,6 @@ export function LoadingCharacters3D({ characters, onReady, presentation = 'cast'
   useEffect(() => { updateCast.current?.(characters, presentation); }, [characters, presentation]);
   const names = characters.map(id => CRAYON_CHARACTERS.find(character => character.id === id)!.name).join(', ');
   return <div ref={hostRef} className="loader-characters-3d" role="img" aria-label={`${names}, animated 3D game characters${presentation === 'gun' ? ', close-up holding a gun' : ''}`}>
-    {unavailable && <span className="loader-3d-fallback">Opening SIXZUN…</span>}
+    {unavailable && <span className="loader-3d-fallback">Opening SIXGUN…</span>}
   </div>;
 }

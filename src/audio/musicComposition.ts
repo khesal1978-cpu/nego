@@ -1,4 +1,4 @@
-// Original SIXZUN composition and synthesis. No recordings, samples or borrowed melodies.
+// Original SIXGUN composition and synthesis. No recordings, samples or borrowed melodies.
 export const MUSIC_SAMPLE_RATE = 22050;
 export const MUSIC_BEAT = 60 / 88;
 export const MUSIC_BARS = 8;

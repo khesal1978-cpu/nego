@@ -3,7 +3,7 @@ import { createWeather } from '../three/weather';
 import { remoteMovement } from '../network/playerControl';
 import { applyNumericState, createMatchSync, numericState } from '../network/matchSync';
 import { createMasonryTexture, createFortGate } from '../three/fortDetail';
-import { batchStaticScenery, disposeSceneGeometry } from '../three/scenePerformance';
+import { batchStaticScenery, disposeSceneGeometry, freezeStaticWorldTransforms, updateCharacterGroundShadow } from '../three/scenePerformance';
 import { approachingThreat, reactionChance } from './enemyBehavior';
 import { createBloodFeedback } from '../three/combatFeedback';
 import { createCharacterRagdolls } from '../three/characterRagdoll';
@@ -864,7 +864,9 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
     // 3. DUAL CHAMPIONSHIP DODGEBALLS IN ALL 3 ROUNDS ("2 ball rakhe hai round 1 me round 2 me bhi 2 and round 3 me")
     // =========================================================================
     applyFortMasonryScale(worldGroup, [castleWallMat, darkStoneMat, warmStoneMat]);
+    for (const cloud of weatherClouds) batchStaticScenery(cloud.group);
     batchStaticScenery(worldGroup, [...animatedWaveRings, ...weatherClouds.map(cloud => cloud.group)]);
+    freezeStaticWorldTransforms(worldGroup, [...animatedWaveRings, ...weatherClouds.map(cloud => cloud.group)]);
     applyExteriorFog(worldGroup, new THREE.Vector4(-29, -29, 29, 29), 29);
 
     const healthKits = createNukeHealthKits();
@@ -1739,6 +1741,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         a.group.visible = true;
         a.group.position.set(a.x, a.visualY, a.z);
         a.group.rotation.y = a.facingYaw;
+        updateCharacterGroundShadow(a.group, a.rig.shadowMesh);
       }
 
       // Reset BOTH Dodgeballs onto their pedestals for Round 1, Round 2, and Round 3!
@@ -2737,6 +2740,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         if (remoteControlled(a)) smoothRemotePosition(a.group.position, { x: a.x, y: a.visualY, z: a.z }, dt);
         else a.group.position.set(a.x, a.visualY, a.z);
         a.group.rotation.y = a.facingYaw;
+        updateCharacterGroundShadow(a.group, a.rig.shadowMesh);
 
 
         const bounce = stepCharacterSpring(a.jiggleY, a.jiggleVelY, 190, 10.5, dt, .28);

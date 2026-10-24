@@ -9,6 +9,33 @@ class StaticSceneryMesh extends THREE.Mesh {
   }
 }
 
+/** Call only on scenery fixed in world space, after placement. Keep moving
+ * branches and their ancestors live; cache the remaining subtrees in one pass. */
+export function freezeStaticWorldTransforms(root: THREE.Object3D, animated: THREE.Object3D[] = []) {
+  const live = new Set<THREE.Object3D>([root]);
+  for (const object of animated) {
+    object.traverse(child => live.add(child));
+    for (let parent = object.parent; parent; parent = parent.parent) live.add(parent);
+  }
+  root.updateWorldMatrix(true, true);
+  const visit = (object: THREE.Object3D) => {
+    if (live.has(object)) { for (const child of object.children) visit(child); return; }
+    object.traverse(child => { child.matrixAutoUpdate = false; child.matrixWorldAutoUpdate = false; });
+    // No transforms in this branch change during the match. Rendering and
+    // shadow passes can reuse its world matrices without walking descendants.
+    object.updateMatrixWorld = () => {};
+  };
+  visit(root);
+}
+
+/** Keep a contact shadow on the floor even while a scaled rig jumps or the
+ * network smooths its vertical position. The shadow is a direct child of root. */
+export function updateCharacterGroundShadow(root: THREE.Object3D, shadow: THREE.Mesh, floorY = .02) {
+  const scale = Math.max(.001, root.scale.y);
+  shadow.position.y = (floorY - root.position.y) / scale;
+  shadow.scale.setScalar(Math.max(.45, 1 - Math.max(0, root.position.y - floorY) * .22));
+}
+
 /** Batch only static opaque scenery; animated objects and pickups keep their
  * own transforms. Matching materials/shadow flags share one draw call. */
 export function batchStaticScenery(root: THREE.Group, animated: THREE.Object3D[] = []) {

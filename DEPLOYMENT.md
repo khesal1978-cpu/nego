@@ -1,4 +1,4 @@
-# Deploy SIXZUN on Vercel with MongoDB Atlas
+# Deploy SIXGUN on Vercel with MongoDB Atlas
 
 The game and multiplayer endpoint run in **one Vercel project**, with **MongoDB Atlas Free** for temporary room state and cross-instance events. Leave `VITE_MULTIPLAYER_URL` empty. Redis and a separate Render service are not required.
 

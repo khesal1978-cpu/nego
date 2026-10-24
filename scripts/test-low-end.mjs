@@ -74,6 +74,11 @@ assert(finalMaterial.fragmentShader.includes('return displayColor;'));
 assert.equal(finalMaterial.uniforms.sharpness.value, 0, 'No extra five-tap sharpening on mobile');
 assert.equal(finalMaterial.uniforms.toneMappingExposure.value, 1.06);
 assert.equal(ratio, 2, 'Optimization preserves sharp default resolution');
+for (let frame = 0; frame < 10; frame++) {
+  renderer.shadowMap.needsUpdate = false;
+  pipeline.render();
+  assert(renderer.shadowMap.needsUpdate, 'Each rendered pose refreshes shadows without a 15 FPS stale silhouette');
+}
 pipeline.dispose();
 console.log('PASS: fused render graph, tone/exposure, single edge smoothing and sharp default framebuffer (renderer stub; not GPU timing).');
 

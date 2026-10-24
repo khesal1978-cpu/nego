@@ -78,6 +78,39 @@ assert.equal(localRebuilds, 0, 'Baked local transforms do no repeated frame work
 const movedBounds = new THREE.Box3().setFromObject(baked);
 assert(movedBounds.min.x > before.min.x && animated.matrixAutoUpdate, 'Moving parents and animated parts still update normally');
 
+// Fixed world scenery skips entire matrix traversals, while an excluded child
+// and its ancestors remain live. A reusable root can still receive a new map.
+const fixedRoot = new THREE.Group(); fixedRoot.position.set(4, 1, 2);
+const fixedBranch = new THREE.Group(), liveBranch = new THREE.Group();
+const fixedMesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
+const liveMesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
+fixedBranch.add(fixedMesh); liveBranch.add(liveMesh); fixedRoot.add(fixedBranch, liveBranch);
+const fixedBounds = new THREE.Box3().setFromObject(fixedRoot);
+m.freezeStaticWorldTransforms(fixedRoot, [liveMesh]);
+const frozenBounds = new THREE.Box3().setFromObject(fixedRoot);
+assert(fixedBounds.min.distanceTo(frozenBounds.min) < 1e-8 && fixedBounds.max.distanceTo(frozenBounds.max) < 1e-8);
+let fixedVisits = 0;
+const visitFixed = fixedMesh.updateMatrixWorld.bind(fixedMesh);
+fixedMesh.updateMatrixWorld = force => { fixedVisits++; visitFixed(force); };
+for (let i = 0; i < 120; i++) { liveBranch.position.y = i; liveMesh.position.x = i; fixedRoot.updateMatrixWorld(); }
+assert.equal(fixedVisits, 0, 'Static descendants are never visited by per-frame matrix updates');
+assert.equal(liveMesh.matrixWorld.elements[12], 123);
+assert.equal(liveMesh.matrixWorld.elements[13], 120);
+assert(fixedRoot.matrixAutoUpdate && liveBranch.matrixAutoUpdate && liveMesh.matrixAutoUpdate);
+const replacement = new THREE.Mesh(new THREE.BoxGeometry(), material); replacement.position.z = 8;
+fixedRoot.clear(); fixedRoot.add(replacement); m.freezeStaticWorldTransforms(fixedRoot);
+fixedRoot.updateMatrixWorld(); assert.equal(replacement.matrixWorld.elements[14], 10);
+
+for (const scale of [1, 1.38, 1.46]) for (const height of [.02, .3, 1, 2.5]) for (const floor of [.02, 3.02]) {
+  const athlete = new THREE.Group(), shadow = new THREE.Mesh(new THREE.PlaneGeometry(), material);
+  athlete.scale.setScalar(scale); athlete.position.set(2, floor + height, 3); athlete.rotation.y = .5; athlete.add(shadow);
+  m.updateCharacterGroundShadow(athlete, shadow, floor);
+  const position = shadow.getWorldPosition(new THREE.Vector3());
+  assert(Math.abs(position.y - floor) < 1e-8, 'Scaled, jumping and smoothed characters keep a floor contact shadow');
+  assert.equal(position.x, 2); assert.equal(position.z, 3);
+}
+console.log('PASS: static world traversal skipping, live descendants, map replacement and floor shadows with scaled/jumping characters.');
+
 // Canvas drawing is mocked here to exercise real model geometry without a GPU.
 // This does not validate how the textures or shaders look on screen.
 globalThis.document = { createElement: () => ({ width: 256, height: 256, getContext: () => new Proxy({
@@ -163,6 +196,41 @@ for (const edge of edges) assert(edge.geometry.parameters.height >= .015 && edge
 buildSync({ stdin: { contents: `export * from './src/three/volleyballNetElasticity';`, loader: 'ts', resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', packages: 'external', outfile: '.npm-cache/net-visual-test.mjs' });
 const elasticity = await import('../.npm-cache/net-visual-test.mjs');
 const netVisual = elasticity.createElasticNetVisual(net);
+const cachedSpring = elasticity.createNetSpring();
+const sampleRest = new Float32Array([-3.6, 1.6, 0, 0, 1.6, 0, .7, 2.1, 0, 3.6, 1.6, 0]);
+const sampleOffsets = new Float32Array(4);
+for (const [x, y, velocity] of [[0, 1.5, -20], [.5, 2, 12], [-.5, 1.2, -14], [1, 1.8, 8]]) cachedSpring.impact(x, y, velocity);
+for (let i = 0; i < 100; i++) {
+  cachedSpring.update(.02); cachedSpring.sampleVertices(sampleRest, sampleOffsets);
+  for (let vertex = 0; vertex < sampleOffsets.length; vertex++) assert(Math.abs(sampleOffsets[vertex] - cachedSpring.displacement(sampleRest[vertex * 3], sampleRest[vertex * 3 + 1])) < 1e-6, 'Cached spring matches direct displacement through impact expiry');
+}
+assert(sampleOffsets.every(value => value === 0));
+// Exercise the actual court scenery, retaining every moving object and the
+// deforming net while reducing static mesh draws. Geometry bounds stay fixed.
+let sceneryBefore = 0, sceneryAfter = 0;
+for (const theme of m.COURT_THEMES) {
+  const world = new THREE.Group(), courtNet = m.createVolleyballNet(theme);
+  const scenery = m.createSceneryProps(theme);
+  world.add(courtNet, scenery.sceneryGroup);
+  const moving = [...scenery.clouds, ...scenery.spinningProps, ...scenery.waveRings, ...scenery.waterfallFoams, ...courtNet.children.filter(child => child.userData.elasticNet)];
+  const boundsBefore = new THREE.Box3().setFromObject(world);
+  world.traverse(object => { if (object.isMesh) sceneryBefore++; });
+  for (const cloud of scenery.clouds) m.batchStaticScenery(cloud, scenery.spinningProps);
+  m.batchStaticScenery(world, moving); m.freezeStaticWorldTransforms(world, moving);
+  const boundsAfter = new THREE.Box3().setFromObject(world);
+  assert(boundsBefore.min.distanceTo(boundsAfter.min) < 1e-4 && boundsBefore.max.distanceTo(boundsAfter.max) < 1e-4, `${theme.id} batching retains scenery bounds`);
+  world.traverse(object => { if (object.isMesh) sceneryAfter++; });
+  for (const object of moving) {
+    assert(object.parent && object.matrixAutoUpdate, 'Moving scenery and elastic net remain attached and animated');
+    const initial = object.getWorldPosition(new THREE.Vector3()); object.position.x += .2;
+    world.updateMatrixWorld();
+    assert(object.getWorldPosition(new THREE.Vector3()).distanceTo(initial) > 1e-6, `${theme.id} animated child follows its rotated/scaled parent`);
+    object.position.x -= .2;
+  }
+  m.disposeSceneGeometry(world);
+}
+assert(sceneryAfter < sceneryBefore, `Batching reduces real court mesh count: ${sceneryBefore} → ${sceneryAfter}`);
+console.log(`PASS: all ${m.COURT_THEMES.length} courts retain bounds/animation; scenery meshes ${sceneryBefore} → ${sceneryAfter} (${Math.round((1 - sceneryAfter / sceneryBefore) * 100)}% fewer).`);
 const cords = net.getObjectByName('Elastic net cords');
 const rest = new Float32Array(cords.geometry.attributes.position.array);
 netVisual.spring.impact(0, 1.6, -20); netVisual.update(.08);

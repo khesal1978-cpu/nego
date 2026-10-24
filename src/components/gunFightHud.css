@@ -2,8 +2,10 @@
 .gun-score i { height: 12px; width: 1px; margin: 0 2px; background: #ffffff36; }
 .gun-score svg { opacity: .75; }
 .gun-score-urgent { color: #f0b6a8; }
-.gun-kill-notice { position: fixed; left: 50%; top: calc(50% + 44px); display: flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid #f1646540; border-radius: 7px; background: #201619a8; color: #f16465; font: 900 13px var(--font-display); letter-spacing: .09em; line-height: 1; pointer-events: none; animation: gunKillConfirm .6s ease-out forwards; }
-@keyframes gunKillConfirm { 0% { opacity: 0; transform: translate(-50%, 3px) scale(.92); } 16%, 62% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -5px) scale(.98); } }
+.gun-kill-notice { position: fixed; left: 50%; top: calc(50% + 44px); display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border: 1px solid #ff998966; border-radius: 5px; background: linear-gradient(100deg, #512526f2, #211d25eb); color: #fff1e9; box-shadow: 0 2px 8px #00000035, inset 0 1px #ffffff12; font: 900 11px var(--font-display); letter-spacing: .1em; line-height: 1; white-space: nowrap; pointer-events: none; animation: gunKillConfirm .6s ease-out forwards; }
+.gun-kill-icon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 3px; background: #f16465; color: #23181d; }
+.gun-kill-label { padding-top: 1px; }
+@keyframes gunKillConfirm { 0% { opacity: 0; transform: translate(-50%, 4px) scale(.88); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.04); } 32%, 65% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -4px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .gun-kill-notice { transform: translateX(-50%); animation-name: gunKillFade; } }
 @keyframes gunKillFade { 0%, 65% { opacity: 1; } 100% { opacity: 0; } }
 @media (max-width: 380px) { .gun-score { gap: 5px; padding-inline: 8px; font-size: 12px; } }

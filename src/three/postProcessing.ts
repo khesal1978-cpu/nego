@@ -84,7 +84,6 @@ export function createStylizedPostPipeline(
   const resolution = new THREE.Vector2();
   const frameBudget = createFrameBudget();
   const compactDevice = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-  let lastShadowFrame = -Infinity;
   renderer.shadowMap.autoUpdate = false;
 
   function applySettings(settings: VisualSettings, comparing: boolean) {
@@ -150,11 +149,9 @@ export function createStylizedPostPipeline(
         applySettings(settings, comparing); lastSettings = settings; lastCompare = comparing;
       }
       renderer.info.reset();
-      const now = performance.now();
-      if (renderer.shadowMap.enabled && now - lastShadowFrame >= 1000 / (compactDevice ? 15 : 30)) {
-        renderer.shadowMap.needsUpdate = true;
-        lastShadowFrame = now;
-      }
+      // Shadows must use the same pose as the visible character, rather than
+      // holding an old silhouette for several animation frames.
+      if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
       composer.render();
       if (!options?.preview) {
         const now = performance.now();

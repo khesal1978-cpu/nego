@@ -7,7 +7,7 @@ import { stepCharacterSpring } from '../three/characterSpring';
 import { characterSceneKey } from '../three/characterSceneKey';
 import { createSpawnShield, updateSpawnShield, RESPAWN_SHIELD_SECONDS } from '../three/spawnShield';
 import { createMasonryTexture, createFortGate } from '../three/fortDetail';
-import { batchStaticScenery, disposeSceneGeometry } from '../three/scenePerformance';
+import { batchStaticScenery, disposeSceneGeometry, freezeStaticWorldTransforms, updateCharacterGroundShadow } from '../three/scenePerformance';
 import { approachingThreat, reactionChance, steerAroundCover } from './enemyBehavior';
 import { createBloodFeedback } from '../three/combatFeedback';
 import { createCharacterRagdolls } from '../three/characterRagdoll';
@@ -1661,7 +1661,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       for (const child of object.children) if (child instanceof THREE.Mesh && child.name === 'crayon_outline') stoneOutlines.push(child);
     });
     for (const outline of stoneOutlines) { outline.removeFromParent(); outline.geometry.dispose(); }
+    for (const vehicle of skyVehicles) batchStaticScenery(vehicle.group, skyVehiclePropellers);
     batchStaticScenery(worldGroup, [...animatedWaveRings, ...skyVehicles.map(vehicle => vehicle.group)]);
+    freezeStaticWorldTransforms(worldGroup, [...animatedWaveRings, ...skyVehicles.map(vehicle => vehicle.group), lagoonMesh]);
 
     // 3. SCARCE, RANDOMIZED 3D MEDKIT PICKUPS (Max 2 Slots Across 8 Random Spots — Never Too Many!)
     const MEDKIT_CANDIDATE_SPOTS: Array<{ x: number; y: number; z: number }> = [
@@ -3785,6 +3787,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           if (remoteControlled(f)) smoothRemotePosition(f.group.position, { x: f.x, y: f.visualY, z: f.z }, dt);
           else f.group.position.set(f.x, f.visualY, f.z);
           f.group.rotation.y = f.facingYaw;
+          updateCharacterGroundShadow(f.group, f.rig.shadowMesh, (f.grounded ? f.y : getFloorHeightAt(f.x, f.z, f.y)) + .02);
 
           // Update Spring-Damper Jiggle Oscillators (Torso Squash/Stretch + Head/Belly Wobble)
           const bounce = stepCharacterSpring(f.jiggleY, f.jiggleVelY, 195, 10.5, dt, .32);

@@ -27,8 +27,9 @@ export function GunFightKillNotice({ kills }: { kills: number }) {
   }, [kills]);
 
   return visible ? (
-    <div key={kills} className="gun-kill-notice" role="status" aria-label="Kill confirmed">
-      <Skull size={12} aria-hidden="true" /><span>KILL</span>
+    <div key={kills} className="gun-kill-notice" role="status" aria-label="Elimination confirmed">
+      <span className="gun-kill-icon" aria-hidden="true"><Skull size={14} strokeWidth={2.5} /></span>
+      <span className="gun-kill-label">ELIMINATED</span>
     </div>
   ) : null;
 }

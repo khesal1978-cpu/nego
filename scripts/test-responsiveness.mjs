@@ -12,7 +12,7 @@ function load(contents, globals = {}) {
 }
 const m = load(`export * from './src/components/nukeControls'; export * from './src/components/volleyballNetCollision'; export * from './src/components/volleyballMovement'; export * from './src/three/visualSettings'; export * from './src/network/customModes'; export * from './src/network/playerControl'; export * from './src/network/matchSync'; export * from './src/network/transport'; export * from './src/network/customCharacters'; export * from './src/three/frameBudget'; export { multiplayerClient } from './src/network/multiplayerClient';`);
 const near = (a, b) => assert(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
-for (const fps of [20, 30, 60, 90, 120, 144]) for (const side of [1, -1]) for (const radius of [.42, .62]) {
+for (const fps of [10, 20, 30, 60, 90, 120, 144]) for (const side of [1, -1]) for (const radius of [m.volleyballBallRadius(false), m.volleyballBallRadius(true)]) {
   const ball = { bx: 0, by: 1.8, bz: 2 * side, bvx: 0, bvy: 0, bvz: -60 * side };
   let hit = false;
   for (let frame = 0; frame < fps / 5; frame++) hit = m.stepVolleyballBall(ball, -14, 1 / fps, radius) || hit;
@@ -23,6 +23,39 @@ for (const fps of [20, 30, 60, 90, 120, 144]) for (const side of [1, -1]) for (c
 }
 const sideline = { bx: 5, by: 1.8, bz: 2, bvx: 0, bvy: 0, bvz: -60 };
 assert(!m.stepVolleyballBall(sideline, -14, .05), 'Shots outside the net width do not hit an invisible barrier');
+near(m.volleyballBallRadius(false), .44); near(m.volleyballBallRadius(true), .66);
+for (const fps of [10, 20, 30, 60, 120, 144]) for (const big of [false, true]) {
+  const radius = m.volleyballBallRadius(big);
+  const falling = { bx: .2, by: 5, bz: 0, bvx: 0, bvy: -30, bvz: 0 };
+  let hits = 0, impact = null;
+  for (let i = 0; i < Math.ceil(fps * .12); i++) {
+    if (m.stepVolleyballBall(falling, -14, 1 / fps, radius, undefined, (x, y, velocity) => { impact = { x, y, velocity }; })) hits++;
+  }
+  assert.equal(hits, 1, 'Descending ball rebounds off top tape once');
+  assert(falling.by >= m.VOLLEYBALL_NET_TOP + radius && falling.bvy > 0);
+  near(impact.x, .2); near(impact.y, m.VOLLEYBALL_NET_TOP);
+  const missedCorner = { bx: 3.825 + radius * .8, by: m.VOLLEYBALL_NET_TOP + radius * .8, bz: 1, bvx: 0, bvy: 0, bvz: -30 };
+  assert(!m.stepVolleyballBall(missedCorner, 0, .1, radius), 'Diagonal clearance uses a round sphere, not an expanded rectangle');
+  const corner = { bx: 3.825 + radius * .55, by: m.VOLLEYBALL_NET_TOP + radius * .55, bz: 1, bvx: 0, bvy: 0, bvz: -30 };
+  assert(m.stepVolleyballBall(corner, 0, .1, radius), 'Sphere contacts the rounded upper side corner');
+  assert(corner.bvx > 0 && corner.bvy > 0, 'Corner normal deflects sideways and upward');
+}
+for (const side of [-1, 1]) {
+  const outgoing = { bx: 0, by: 1.6, bz: side * .2, bvx: 0, bvy: 0, bvz: side * 3 };
+  let impacts = 0;
+  assert(!m.stepVolleyballBall(outgoing, 0, .05, .44, undefined, () => impacts++));
+  assert(outgoing.bz * side >= .482 && outgoing.bvz * side > 0 && impacts === 0, 'Outgoing overlap separates without replaying net hit');
+  const incoming = { ...outgoing, bz: side * .2, bvz: -side * 3 };
+  assert(m.stepVolleyballBall(incoming, 0, .05, .44, undefined, () => impacts++));
+  assert(incoming.bz * side >= .482 && incoming.bvz * side > 0 && impacts === 1);
+}
+for (const fps of [10, 20, 60, 144]) for (const big of [false, true]) {
+  const radius = m.volleyballBallRadius(big);
+  const tapeBall = { bx: 0, by: 3.5, bz: 0, bvx: 0, bvy: -8, bvz: 0 };
+  for (let frame = 0; frame < fps * 2; frame++) m.stepVolleyballBall(tapeBall, -14, 1 / fps, radius);
+  assert(Math.abs(tapeBall.bz) > radius + .04 && tapeBall.by < m.VOLLEYBALL_NET_TOP, 'Vertical top-tape shots fall into a court instead of getting stuck bouncing forever');
+}
+console.log('PASS: net top/rounded corners, actual big-ball size, contact-position feedback and incoming/outgoing overlaps at 10–144 FPS.');
 const dive = { px: 0, pz: 1, pvx: 0, pvz: -30, pDiveTimer: .5 };
 m.moveVolleyballPlayer(dive, 0, -1, 10, .1);
 near(dive.pz, .85); near(dive.pvz, 0);
@@ -212,7 +245,7 @@ near(stalledBudget.scale, .85);
 console.log('PASS: 1v1 actor/control mapping on either team and adaptive recovery below 10 FPS.');
 
 const spring = load(`export * from './src/three/characterSpring';`).stepCharacterSpring;
-for (const [stiffness, damping] of [[195, 10.5], [190, 10.5], [185, 10.2], [160, 9.5], [155, 9.2]]) {
+for (const [stiffness, damping] of [[210, 11.5], [195, 10.5], [190, 10.5], [185, 10.2], [160, 9.5], [155, 9.2]]) {
   const expected = spring(.1, 1, stiffness, damping, 1, 1);
   for (const fps of [10, 20, 30, 60, 90, 120, 144]) {
     let state = { position: .1, velocity: 1 };

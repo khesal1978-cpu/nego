@@ -20,7 +20,7 @@ export function NameEntry({ name, height, touch, portrait, onName, onConfirm }: 
       <label className="name-entry-field" htmlFor="athlete-name">Player name
         <input id="athlete-name" name="athleteName" value={name} maxLength={16} autoFocus={!touch} autoComplete="nickname" autoCapitalize="off" spellCheck={false} enterKeyHint="go" placeholder="Enter athlete name…" onChange={event => onName(event.target.value)} />
       </label>
-      <div className="name-entry-presets" aria-label="Suggested names">{['SIXZUN_KING', 'STORM_ACE', 'NUKE_BOSS', 'BLASTER_X', 'VOLLEY_PRO'].map(preset => <button type="button" key={preset} onClick={() => onName(preset)}>{preset}</button>)}</div>
+      <div className="name-entry-presets" aria-label="Suggested names">{['SIXGUN_KING', 'STORM_ACE', 'NUKE_BOSS', 'BLASTER_X', 'VOLLEY_PRO'].map(preset => <button type="button" key={preset} onClick={() => onName(preset)}>{preset}</button>)}</div>
       <button className="name-entry-submit" type="submit">Enter arena <span>as {name.trim() || 'LEO_PRO'}</span></button>
     </form>
   </div>;

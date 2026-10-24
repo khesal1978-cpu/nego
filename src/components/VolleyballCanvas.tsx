@@ -10,7 +10,7 @@ import { createFrameBudget } from '../three/frameBudget';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { moveVolleyballPlayer } from './volleyballMovement';
-import { stepVolleyballBall, volleyballCourtZ } from './volleyballNetCollision';
+import { stepVolleyballBall, volleyballCourtZ, volleyballBallRadius } from './volleyballNetCollision';
 import { createElasticNetVisual } from '../three/volleyballNetElasticity';
 import { volleyballSwipeDirection, volleyballSwipeTarget } from './volleyballSwipe';
 import { applyNumericState, createMatchSync, numericState } from '../network/matchSync';
@@ -19,7 +19,7 @@ import { volleyballFollowCamera } from '../three/volleyballCamera';
 import { smoothRemotePosition, useHostMotion } from '../network/remoteMotion';
 import { stepCharacterSpring } from '../three/characterSpring';
 import { volleyballLighting } from '../three/volleyballLighting';
-import { disposeSceneGeometry } from '../three/scenePerformance';
+import { batchStaticScenery, disposeSceneGeometry, freezeStaticWorldTransforms, updateCharacterGroundShadow } from '../three/scenePerformance';
 import {
   AIDifficulty,
   BALL_SKINS,
@@ -549,7 +549,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       vBall.ballShadow.visible = !isMenuOrStudio;
       vBall.targetGroup.visible = !isMenuOrStudio && !isLiveCourtPreview;
 
-      const ballScale = mod === 'big_ball' ? 1.55 : 1.0;
+      const ballScale = mod === 'big_ball' ? 1.5 : 1.0;
       vBall.ballGroup.scale.setScalar(ballScale);
       vBall.bombCapGroup.visible = !isMenuOrStudio && gMode === 'bomb_potato';
 
@@ -583,6 +583,15 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         waveRingsList = scenery.waveRings;
         waterfallTexturesList = scenery.waterfallTextures;
         waterfallFoamsList = scenery.waterfallFoams;
+        const animatedScenery = [
+          ...cloudsList, ...spinningPropsList, ...waveRingsList, ...waterfallFoamsList,
+          ...netGroup.children.filter(child => child.userData.elasticNet),
+        ];
+        // Vehicles/clouds move as whole groups; batch their rigid attached
+        // parts as well, while propellers keep their independent transforms.
+        for (const cloud of cloudsList) batchStaticScenery(cloud, spinningPropsList);
+        batchStaticScenery(worldPropsRoot, animatedScenery);
+        freezeStaticWorldTransforms(worldPropsRoot, animatedScenery);
       }
 
       const playerFacing: 1 | -1 = isMenuOrStudio ? 1 : -1;
@@ -742,6 +751,9 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       landingZ: 4.5,
     };
     let lastNetHit: { id: number; x: number; y: number; velocity: number } | null = null;
+    const recordNetHit = (x: number, y: number, velocity: number) => {
+      lastNetHit = { id: (lastNetHit?.id || 0) + 1, x, y, velocity };
+    };
     let receivedNetHit = 0;
     let receivedNetHost = '';
     const ballFields = ['bx', 'by', 'bz', 'bvx', 'bvy', 'bvz', 'rallyCount', 'pointDelayTimer', 'serveWaitTimer'] as const;
@@ -770,7 +782,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       vz: number
     ) => {
       const grav = getGravity();
-      const targetY = propsRef.current.modifier === 'big_ball' ? 0.62 : 0.42;
+      const targetY = volleyballBallRadius(propsRef.current.modifier === 'big_ball');
       const dy = y0 - targetY;
       const disc = vy * vy - 2 * grav * dy;
       if (disc < 0) {
@@ -806,7 +818,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           ? THREE.MathUtils.clamp(targetZ, 1.35, 5.95)
           : THREE.MathUtils.clamp(targetZ, -5.95, -1.35);
 
-      const targetY = propsRef.current.modifier === 'big_ball' ? 0.62 : 0.42;
+      const targetY = volleyballBallRadius(propsRef.current.modifier === 'big_ball');
       gameData.bvx = (clampedX - gameData.bx) / T;
       gameData.bvz = (clampedZ - gameData.bz) / T;
       gameData.bvy = (targetY - gameData.by - 0.5 * grav * T * T) / T;
@@ -857,7 +869,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       const T = Math.max(1.08, flightDuration);
       const clampedX = THREE.MathUtils.clamp(targetX, -2.5, 2.5);
       const clampedZ = THREE.MathUtils.clamp(targetZ, 1.15, 2.25);
-      const targetY = propsRef.current.modifier === 'big_ball' ? 0.62 : 0.42;
+      const targetY = volleyballBallRadius(propsRef.current.modifier === 'big_ball');
 
       gameData.bvx = (clampedX - gameData.bx) / T;
       gameData.bvz = (clampedZ - gameData.bz) / T;
@@ -1665,7 +1677,6 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
     const frameBudget = createFrameBudget();
     let qualityFrames = 0, qualityStart = performance.now();
     let lastMenuFrame = 0;
-    let lastShadowFrame = -Infinity;
 
     const ownerTickTimes = new Map<string, number>();
     const ownerMotion = new Map<string, { prefix: 'p' | 'pt' | 'a1' | 'a2'; side: 1 | -1; x: number; y: number; z: number; vx: number; vz: number; received: number }>();
@@ -1704,7 +1715,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         if (applyBall) {
           applyNumericState(gameData, p.ball, ballFields);
           gameData.bx *= sign; gameData.bz *= sign; gameData.bvx *= sign; gameData.bvz *= sign;
-          if (p.ball.phase === 'RALLY') Object.assign(gameData, predictVolleyBall({ bx: gameData.bx, by: gameData.by, bz: gameData.bz, bvx: gameData.bvx, bvy: gameData.bvy, bvz: gameData.bvz }, networkTiming.delay(evt.senderId) * (propsRef.current.gameSpeedMultiplier ?? 1), getGravity(), propsRef.current.modifier === 'big_ball' ? .62 : .42));
+          if (p.ball.phase === 'RALLY') Object.assign(gameData, predictVolleyBall({ bx: gameData.bx, by: gameData.by, bz: gameData.bz, bvx: gameData.bvx, bvy: gameData.bvy, bvz: gameData.bvz }, networkTiming.delay(evt.senderId) * (propsRef.current.gameSpeedMultiplier ?? 1), getGravity(), volleyballBallRadius(propsRef.current.modifier === 'big_ball')));
           if (['RALLY', 'SERVE_WAIT', 'POINT_DELAY'].includes(p.ball.phase)) gameData.phase = p.ball.phase;
           gameData.lastHitter = sign === 1 ? (p.ball.lastHitter === 'ai' ? 'ai' : p.ball.lastHitter === 'self_set' || p.ball.lastHitter === 'partner_set' ? 'partner_set' : 'partner') : p.ball.lastHitter === 'ai' ? 'partner' : 'ai';
           lastHitterId = p.lastHitterId;
@@ -1764,7 +1775,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           gameData.a1SwingTimer = 0.36;
         }
         gameData.isRainbowSmash = Boolean(p.rainbowSmash || p.superSmash);
-        Object.assign(gameData, predictVolleyBall({ bx: gameData.bx, by: gameData.by, bz: gameData.bz, bvx: gameData.bvx, bvy: gameData.bvy, bvz: gameData.bvz }, networkTiming.delay(evt.senderId) * (propsRef.current.gameSpeedMultiplier ?? 1), getGravity(), propsRef.current.modifier === 'big_ball' ? .62 : .42));
+        Object.assign(gameData, predictVolleyBall({ bx: gameData.bx, by: gameData.by, bz: gameData.bz, bvx: gameData.bvx, bvy: gameData.bvy, bvz: gameData.bvz }, networkTiming.delay(evt.senderId) * (propsRef.current.gameSpeedMultiplier ?? 1), getGravity(), volleyballBallRadius(propsRef.current.modifier === 'big_ball')));
         matchSync.invalidate();
         gameData.isSuperSmash = Boolean(p.superSmash);
         const hittingTeam = fromHost ? p.team : senderSlot.team;
@@ -1792,10 +1803,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         qualityStart = timestamp; qualityFrames = 0;
       }
       timer.update(timestamp);
-      if (renderer.shadowMap.enabled && timestamp - lastShadowFrame >= 1000 / (compactDevice ? 15 : 30)) {
-        renderer.shadowMap.needsUpdate = true;
-        lastShadowFrame = timestamp;
-      }
+      if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
       qualityFrames++;
       if (timestamp - qualityStart >= 1000) {
         if (timestamp - qualityStart < 1600 && frameBudget.sample(qualityFrames * 1000 / (timestamp - qualityStart))) {
@@ -2270,9 +2278,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
             gameData.bvx += Math.sin(elapsed * 1.6) * 1.15 * dt;
           }
 
-          const netImpactVelocity = gameData.bvz;
-          if (stepVolleyballBall(gameData, effGravity, dt, currentMod === 'big_ball' ? .62 : .42, elasticNet?.spring)) {
-            lastNetHit = { id: (lastNetHit?.id || 0) + 1, x: gameData.bx, y: gameData.by, velocity: netImpactVelocity };
+          if (stepVolleyballBall(gameData, effGravity, dt, volleyballBallRadius(currentMod === 'big_ball'), elasticNet?.spring, recordNetHit)) {
             matchSync.invalidate();
             crayonAudio.playNetTouch();
             gameData.ballJiggleVel -= 2;
@@ -2648,7 +2654,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           }
 
           // 4. Check Ground Touch (Point Scored!)
-          const groundY = currentMod === 'big_ball' ? 0.62 : 0.42;
+          const groundY = volleyballBallRadius(currentMod === 'big_ball');
           if (gameData.by <= groundY) {
             gameData.by = groundY;
             crayonAudio.playBallFloorBounce(1.0);
@@ -2690,7 +2696,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           }
         } else if (gameData.phase === 'POINT_DELAY') {
           gameData.pointDelayTimer -= dt;
-          gameData.by = 0.42 + Math.abs(Math.sin(elapsed * 6)) * 0.15;
+          gameData.by = volleyballBallRadius(currentMod === 'big_ball') + Math.abs(Math.sin(elapsed * 6)) * 0.15;
           if (
             matchSync.authority() && gameData.pointDelayTimer <= 0 &&
             propsRef.current.gameState === 'PLAYING'
@@ -2885,12 +2891,10 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         rig.rightFoot.position.y =
           0.1 + Math.max(0, Math.cos(elapsed * 12)) * (0.04 + moveSpeed * 0.015);
 
-        rig.shadowMesh.position.y = -y + 0.02;
-        const sScale = Math.max(0.45, 1.0 - y * 0.22);
-        rig.shadowMesh.scale.setScalar(sScale);
+        updateCharacterGroundShadow(rig.root, rig.shadowMesh);
 
         if (rig.playerRing) {
-          rig.playerRing.position.y = -y + 0.022;
+          rig.playerRing.position.y = (.022 - rig.root.position.y) / rig.root.scale.y;
           const rPulse = 1 + Math.sin(elapsed * 5) * 0.05;
           rig.playerRing.scale.setScalar(rPulse);
         }
@@ -2943,13 +2947,9 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       }
 
       // Update Volleyball, Spring Jiggle, Shadow & Indicating Landing Circle
-      gameData.ballJiggleVel +=
-        (-210 * gameData.ballJiggle - 11.5 * gameData.ballJiggleVel) * dt;
-      gameData.ballJiggle = THREE.MathUtils.clamp(
-        gameData.ballJiggle + gameData.ballJiggleVel * dt,
-        -0.3,
-        0.3
-      );
+      const ballSpring = stepCharacterSpring(gameData.ballJiggle, gameData.ballJiggleVel, 210, 11.5, dt, .3);
+      gameData.ballJiggle = ballSpring.position;
+      gameData.ballJiggleVel = ballSpring.velocity;
       const baseBallScale = currentMod === 'big_ball' ? 1.5 : 1.0;
       vBall.ballGroup.position.set(gameData.bx, gameData.by, gameData.bz);
       vBall.ballGroup.scale.set(
