@@ -6,7 +6,7 @@ The repository contains the Atlas integration. A real cluster, its Vercel connec
 
 ## Create and connect a free cluster
 
-1. Install the MongoDB Node driver locally with `npm install "mongodb@^6" --legacy-peer-deps`, then push the updated source and **both package.json and package-lock.json** to the existing GitHub repository. Include `api/`, `server/`, `src/`, `scripts/`, `public/` and the root configuration files. Keep `.env`, caches, `node_modules`, `dist`, `build` and `.maintenance` excluded.
+1. Install dependencies locally with `npm ci`, then push the updated source and **both package.json and package-lock.json** to the existing GitHub repository. Include `api/`, `server/`, `src/`, `scripts/`, `public/` and the root configuration files. Keep `.env`, caches, `node_modules`, `dist`, `build` and `.maintenance` excluded.
 2. Open the existing game project in Vercel. Use **Vite**, the repository root, **Node 22.x**, and **Fluid compute**. `vercel.json` supplies the install/build commands, `dist` output, Mumbai (`bom1`) region and a 300-second multiplayer function duration.
 3. In Vercel Marketplace/Storage, search for **MongoDB Atlas** and install its native integration. Choose the **Free cluster ($0, 512 MB)** and **Free installation plan ($0)**. Choose Mumbai if available, or the nearest listed region. Name the resource `sixzun` and create it. Free and paid cluster choices are distinct; verify both selections before submitting.
 4. Connect the new resource to the game project and its **Production** environment. The integration supplies the server-only **MONGODB_URI**. Set **MONGODB_DB=sixzun** in Project Settings > Environment Variables to choose the application database explicitly.

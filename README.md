@@ -1,6 +1,6 @@
 # SIXZUN
 
-Requires Node.js 22+ and npm. Run `npm ci --legacy-peer-deps`, then `npm run dev` (or double-click `start-preview.cmd` on Windows). Open the URL printed by the server. No AI API key is needed. The peer flag preserves this project's existing Vite/esbuild dependency combination.
+Requires Node.js 22 and npm. Run `npm ci`, then `npm run dev` (or double-click `start-preview.cmd` on Windows). Open the URL printed by the server. No AI API key is needed.
 
 `npm run lint` checks TypeScript; `npm run build` creates the production client in `dist`. Regression checks are the `test:*` commands in `package.json`.
 
