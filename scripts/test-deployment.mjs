@@ -3,6 +3,7 @@ import { buildSync } from 'esbuild';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { once } from 'node:events';
+import { gzipSync } from 'node:zlib';
 import vm from 'node:vm';
 import WebSocket from 'ws';
 import React from 'react';
@@ -79,6 +80,17 @@ try {
   assert.equal((await fetch(base + '/api/health', { headers: { Origin: 'https://bad.example' } })).status, 403);
   assert.equal((await fetch(base + '/api/mp/state', { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST' } })).status, 204);
   assert.equal((await fetch(base + '/missing')).status, 404, 'Backend never serves a game SPA in backend-only mode');
+  const roomBody = JSON.stringify({ playerId: 'deployment-http-probe', name: 'Probe', customCode: 'SAFE' });
+  const compressed = gzipSync(roomBody);
+  for (const body of [compressed, Buffer.concat([compressed, Buffer.from('trailing garbage')])]) {
+    const response = await fetch(base + '/api/mp/room/create', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' }, body });
+    assert.equal(response.status, 415, 'Compressed JSON is rejected before decompression');
+    await response.text();
+  }
+  const plain = await fetch(base + '/api/mp/room/create', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: roomBody });
+  assert.equal(plain.status, 200, 'Plain JSON room requests still work after malformed compressed bodies');
+  assert.equal((await plain.json()).room.code, 'SAFE');
+  assert.equal((await fetch(base + '/api/health', { headers: { Origin: origin } })).status, 200, 'Backend survives malformed compressed bodies');
   ws = new WebSocket(base.replace('http:', 'ws:') + '/ws', { origin });
   await once(ws, 'open');
   const identified = new Promise((resolve, reject) => {
@@ -88,7 +100,7 @@ try {
   ws.send(JSON.stringify({ type: 'player:identify', playerId: 'deployment-probe', name: 'Probe' })); await identified;
   const rejected = new WebSocket(base.replace('http:', 'ws:') + '/ws', { origin: 'https://bad.example' });
   await new Promise((resolve, reject) => { rejected.once('error', error => { assert.match(error.message, /403/); resolve(); }); rejected.once('open', () => { rejected.close(); reject(Error('Disallowed WS origin connected')); }); });
-  console.log('PASS: disposable production backend HTTP health, CORS/preflight, WebSocket identity and rejected cross-origin upgrades.');
+  console.log('PASS: disposable production backend compressed-body rejection/recovery, HTTP health, CORS/preflight, WebSocket identity and rejected cross-origin upgrades.');
 } finally {
   ws?.terminate(); child.kill(); await once(child, 'exit').catch(() => {});
 }

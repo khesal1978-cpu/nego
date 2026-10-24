@@ -3,22 +3,23 @@ import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createRoomEngine, type CustomRoomState, type RoomNotice } from './roomEngine';
 import { executeRoomRequest } from './roomRoutes';
-import { createRedisRoomStore, redisEnvironment, type RoomCommit, type RoomStore } from './redisRooms';
+import { createMongoRoomStore, mongoEnvironment } from './mongoRooms';
+import type { RoomCommit, RoomStore } from './roomStore';
 import { createOriginPolicy } from './originPolicy';
 import { createTurnCredentials } from './turnCredentials';
 import { MAX_REALTIME_BUFFER } from '../src/network/transport';
 
 export function createVercelMultiplayer(env = process.env, providedStore?: RoomStore) {
   const app = express(), server = http.createServer(app);
-  const config = redisEnvironment(env);
-  const store = providedStore || (config ? createRedisRoomStore(config) : null);
+  const config = mongoEnvironment(env);
+  const store = providedStore || (config ? createMongoRoomStore(config) : null);
   const turn = createTurnCredentials(env), allowed = createOriginPolicy(env.ALLOWED_ORIGINS, true);
   const instance = Math.random().toString(36).slice(2);
   const sockets = new Map<WebSocket, { playerId: string; turnAt: number; alive: boolean }>();
   let rooms = new Map<string, CustomRoomState>(), revision = 0, epoch = '';
   let subscription: AbortController | null = null, retry: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
-  const setupError = 'Online rooms are not configured yet. Connect a Free Upstash Redis database to this Vercel project. Solo play is available.';
+  const setupError = 'Online rooms are not configured yet. Set MONGODB_URI for your MongoDB Atlas Free cluster in this Vercel project. Solo play is available.';
   const send = (socket: WebSocket, message: unknown, replaceable = false) => {
     if (socket.bufferedAmount > 2 * 1024 * 1024) { socket.close(1013, 'Connection is too slow; reconnecting'); return; }
     if (socket.readyState === WebSocket.OPEN && (!replaceable || socket.bufferedAmount < MAX_REALTIME_BUFFER)) socket.send(JSON.stringify(message));
@@ -84,7 +85,7 @@ export function createVercelMultiplayer(env = process.env, providedStore?: RoomS
   function ensureSubscription() {
     if (!store || subscription || disposed || !sockets.size) return;
     const controller = new AbortController(); subscription = controller;
-    void store.subscribe(message => { void incoming(message).catch(() => {}); }, resync, controller.signal).catch(() => {
+    void store.subscribe(incoming, resync, controller.signal).catch(() => {
       if (!controller.signal.aborted) for (const socket of sockets.keys()) send(socket, { type: 'room:error', message: 'Room connection interrupted. Reconnecting…' });
     }).finally(() => {
       if (subscription === controller) subscription = null;
@@ -104,13 +105,14 @@ export function createVercelMultiplayer(env = process.env, providedStore?: RoomS
     if (req.method === 'OPTIONS') { res.status(204).end(); return; }
     next();
   });
-  app.use(express.json({ limit: '32kb' }));
+  // Game clients send plain JSON; reject compressed bodies before decompression.
+  app.use(express.json({ limit: '32kb', inflate: false }));
   app.use(async (req, res) => {
     const path = typeof req.query.route === 'string' ? req.query.route : req.path;
     if (path === '/api/health') {
       if (!store) { res.status(503).json({ status: 'setup_required', error: setupError }); return; }
-      try { await store.read(); res.json({ status: 'ok', storage: 'redis', instanceId: instance }); }
-      catch { res.status(503).json({ status: 'unavailable', error: 'Check the Redis connection and plan limits.' }); }
+      try { await store.read(); res.json({ status: 'ok', storage: 'mongodb', instanceId: instance }); }
+      catch { res.status(503).json({ status: 'unavailable', error: 'Check the MongoDB connection, database permissions and Atlas network access.' }); }
       return;
     }
     if (!path.startsWith('/api/mp/')) { res.status(404).json({ error: 'Not found' }); return; }
@@ -144,6 +146,10 @@ export function createVercelMultiplayer(env = process.env, providedStore?: RoomS
   const relayQueue: any[] = []; let relayTimer: ReturnType<typeof setTimeout> | null = null;
   function publishRelay(item: any) {
     if (!store) return;
+    if (item.replaceable) {
+      const index = relayQueue.findIndex(previous => previous.replaceable && previous.roomCode === item.roomCode && previous.senderId === item.senderId && previous.targetId === item.targetId && previous.packet.type === item.packet.type && previous.packet.eventKind === item.packet.eventKind);
+      if (index >= 0) { relayQueue[index] = item; return; }
+    }
     if (relayQueue.length >= 128) {
       if (item.replaceable) return;
       // Reliable actions are never dropped behind replaceable position updates.
@@ -156,7 +162,7 @@ export function createVercelMultiplayer(env = process.env, providedStore?: RoomS
       void store.publish({ kind: 'relay', instance, packets }).catch(() => {
         for (const socket of sockets.keys()) send(socket, { type: 'room:error', message: 'Match relay interrupted. Check your connection.' });
       });
-    }, 8);
+    }, 50);
     relayTimer.unref();
   }
   wss.on('connection', socket => {

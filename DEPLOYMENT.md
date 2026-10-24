@@ -1,59 +1,69 @@
-# Deploy SIXZUN on Vercel
+# Deploy SIXZUN on Vercel with MongoDB Atlas
 
-The game and multiplayer endpoint run in **one Vercel project**, with **Upstash Redis** for temporary room state and events shared between function instances. Leave `VITE_MULTIPLAYER_URL` empty. This setup does not require a Render service.
+The game and multiplayer endpoint run in **one Vercel project**, with **MongoDB Atlas Free** for temporary room state and cross-instance events. Leave `VITE_MULTIPLAYER_URL` empty. Redis and a separate Render service are not required.
 
-The repository contains the integration. A real Redis database, its Vercel connection and the hosted deployment still need to be configured. Building succeeds without Redis; solo play works, while online room actions show a setup message until storage is connected.
+The repository contains the Atlas integration. A real cluster, its Vercel connection and the hosted deployment still need to be configured. Building succeeds without database credentials; solo play works, while online room actions show a setup message until Atlas is connected.
 
-## Connect the project and free storage
+## Create and connect a free cluster
 
-1. Push the updated source to the repository already configured as `origin`. Include `api/`, `server/`, `src/`, `scripts/`, `public/` and the root configuration files. Exclude `.env`, caches, `node_modules`, `dist`, `build` and `.maintenance` as specified in `.gitignore`.
-2. Import or open that repository in Vercel. Use **Vite**, the repository root, **Node 22.x**, and **Fluid compute**. `vercel.json` supplies the install/build commands, `dist` output, Mumbai (`bom1`) region and a 300-second multiplayer function duration.
-3. In the project's **Storage** area, connect **Upstash Redis** through the Marketplace. Select the **Free / $0** plan and a nearby available primary region. Review the displayed plan before creating the database; do not select a paid upgrade.
-4. Connect the database to the intended Vercel environments. The backend accepts either `UPSTASH_REDIS_REST_URL` with `UPSTASH_REDIS_REST_TOKEN`, or the Marketplace's `KV_REST_API_URL` with `KV_REST_API_TOKEN`. These must be server environment variables, never `VITE_` variables or committed files. A read-only token cannot update rooms.
-5. Remove any old `VITE_MULTIPLAYER_URL` value pointing to an external backend. Keep `VITE_ENABLE_PUBLIC_MQTT=false`. Same-origin requests work automatically; `ALLOWED_ORIGINS` is optional for additional exact origins, comma-separated. No wildcard is needed.
-6. Redeploy after attaching storage or changing variables. Open `/api/health` on the deployment and confirm HTTP 200 with `status: "ok"` and `storage: "redis"`. A 503 with `setup_required` means credentials are absent; `unavailable` means Redis cannot be reached or its limits were reached.
+1. Install the MongoDB Node driver locally with `npm install "mongodb@^6" --legacy-peer-deps`, then push the updated source and **both package.json and package-lock.json** to the existing GitHub repository. Include `api/`, `server/`, `src/`, `scripts/`, `public/` and the root configuration files. Keep `.env`, caches, `node_modules`, `dist`, `build` and `.maintenance` excluded.
+2. Open the existing game project in Vercel. Use **Vite**, the repository root, **Node 22.x**, and **Fluid compute**. `vercel.json` supplies the install/build commands, `dist` output, Mumbai (`bom1`) region and a 300-second multiplayer function duration.
+3. In Vercel Marketplace/Storage, search for **MongoDB Atlas** and install its native integration. Choose the **Free cluster ($0, 512 MB)** and **Free installation plan ($0)**. Choose Mumbai if available, or the nearest listed region. Name the resource `sixzun` and create it. Free and paid cluster choices are distinct; verify both selections before submitting.
+4. Connect the new resource to the game project and its **Production** environment. The integration supplies the server-only **MONGODB_URI**. Set **MONGODB_DB=sixzun** in Project Settings > Environment Variables to choose the application database explicitly.
+5. Remove any previous external `VITE_MULTIPLAYER_URL` value and keep `VITE_ENABLE_PUBLIC_MQTT=false`. Old Redis variables are unused by this version. Same-origin requests work automatically; `ALLOWED_ORIGINS` is only needed for additional exact frontend origins.
+6. Redeploy after connecting the database or changing variables. Open `/api/health` on the deployment and confirm HTTP 200 with `status: "ok"` and `storage: "mongodb"`. A 503 with `setup_required` means MONGODB_URI is absent; `unavailable` means the cluster, network access or database permissions need checking.
 
-The default Redis namespace isolates the Vercel project and Production/Preview/Development environments. Set `REDIS_NAMESPACE` only when deliberately choosing a shared namespace; avoid pointing a test deployment at production room data. Preview deployments within the same environment can share rooms, so reload all test players onto the same release.
+The native integration uses a database user and allows incoming database connections from any IP because Vercel uses dynamic outbound addresses. Authentication is still required. Review the integration's account/network access settings when installing it. These account changes are not performed by this repository. [MongoDB's Vercel integration guide](https://www.mongodb.com/docs/atlas/reference/partner-integrations/vercel/).
 
-The game is at `/`, its standalone policy is at `/privacy.html`, and **Settings → About** contains the policy and ArsDev YouTube credit. Browser saves remain tied to the browser and website origin.
+The default room namespace isolates the Vercel project and Production/Preview/Development environments. Set `MONGODB_NAMESPACE` only when deliberately choosing a shared namespace. Preview deployments in the same environment can share rooms, so reload all test players onto the same release.
 
-## What uses the free quota
+If you already have an Atlas cluster, add its **Connect > Drivers > Node.js** connection string as MONGODB_URI instead of creating another cluster. Use a database user with read/write and index-creation access to `sixzun`, replace the password placeholder with the actual URL-encoded database password, and configure Atlas Network Access for the deployment. Do not paste the URI into chat, client variables or source control.
 
-Upstash's published Free plan is **$0**, with **250 MB storage, 500,000 commands/month and 10 GB monthly bandwidth**, checked 24 October 2026. Vercel has its own usage limits. Verify the plan shown in the dashboard; adding a card or selecting another plan may change billing. [Upstash pricing](https://upstash.com/pricing/redis).
+## Free-plan limits and multiplayer behavior
 
-Solo/bot matches and ordinary menus do not open multiplayer connections. Online room controls persist authoritative state with an atomic compare-and-set, so simultaneous joins cannot overwrite each other. Presence writes are batched per active instance every 25 seconds. Direct WebRTC carries gameplay when available; fallback to players on another instance uses batched Redis pub/sub and can consume quota much faster. HTTP polling also consumes reads when WebSockets are unavailable.
+Atlas Free is **$0** with **512 MB storage including indexes**, **100 read/write operations per second**, **500 database connections**, and **10 GB inbound plus 10 GB outbound transfer per rolling seven days**, checked 24 October 2026. It has throughput and network limits rather than Upstash Free's 500,000-command monthly allowance. These numbers are database limits, not player-count guarantees. Vercel usage limits are separate. [Atlas pricing](https://www.mongodb.com/pricing) and [Free limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/).
 
-The command quota measures operations across the month, **not total users or simultaneous players**. No 500–1,000 concurrent-player capacity has been measured. The current shared lobby document has defensive bounds of 150 rooms and 750 client records, which are implementation limits rather than tested capacity. Load testing and dashboard usage measurements are required before increasing these bounds or advertising a player count.
+Solo/bot matches and ordinary menus do not open multiplayer connections. Online room controls use an atomic version-and-epoch check; concurrent joins retry against fresh state instead of overwriting each other. The state and its notification commit are stored in one document. MongoDB change streams notify active Vercel instances, and reconnects reload authoritative room state.
+
+Direct WebRTC carries gameplay where available. Cross-instance fallback stores short-lived relay batches, coalescing intermediate replaceable positions over 50ms while retaining reliable match actions/results. This adds batching delay to fallback delivery; it does not make Atlas a faster game relay than a direct peer connection. Presence writes are batched per active instance every 25 seconds. Each warm instance reuses a MongoDB client with a pool of at most five application connections; driver monitoring connections also count toward Atlas limits.
+
+No 500–1,000 simultaneous-player capacity has been tested. The shared lobby document has defensive bounds of 150 rooms and 750 client records, which are implementation bounds rather than supported capacity. Change-stream reads, cross-instance fallback and many active function instances can reach free-plan throughput/connection limits. Measure actual Atlas/Vercel usage and phone latency before broadly sharing the game.
 
 ## Optional connection relay
 
-Direct peer connections use STUN by default. For networks that require TURN, configure Cloudflare Realtime TURN on the Vercel server:
+Direct peers use STUN by default. For networks needing TURN, configure these optional Cloudflare Realtime TURN secrets on the Vercel server:
 
 ```text
 CLOUDFLARE_TURN_KEY_ID=<TURN key ID>
 CLOUDFLARE_TURN_API_TOKEN=<TURN API token>
 ```
 
-Keep both secrets server-side. Room participants receive cached, short-lived ICE credentials. Without TURN the WebSocket fallback remains available, but cross-instance fallback uses Redis quota. TURN has separate provider usage/billing terms and is optional; no TURN service is provisioned by the code.
+Room participants receive cached, short-lived ICE credentials. Without TURN, the WebSocket/database fallback remains available. TURN has separate provider usage/billing terms and no TURN service is provisioned automatically.
 
 ## Verify before sharing
 
-1. Open the same release on two devices, preferably Wi-Fi and mobile data. Check `/api/health` and create/join the same custom room.
-2. Test Volleyball 1v1 and 2v2, Gun Fight and Nuke: ready/start, movement/actions, results, Back to room and a second match. Check both host and guest.
-3. Keep a match open beyond five minutes. Vercel closes sockets at the configured function-duration limit; the client reconnects and shared storage restores room membership. Confirm play recovers on the hosted deployment.
-4. Try voice opt-in and a Wi-Fi/mobile-data switch. Check `/ws` on the game domain and watch for CORS, connection and storage errors.
-5. Check Settings → About, `/privacy.html`, saves after reopening, and iPhone Share → Add to Home Screen. Measure real phone FPS/latency and Redis/Vercel usage before broad sharing.
+1. Open the same release on two devices, preferably Wi-Fi and mobile data. Check `/api/health`, then create/join the same custom room.
+2. Test Volleyball 1v1/2v2, Gun Fight and Nuke: ready/start, movement/actions, results, Back to room and a second match. Check host and guest.
+3. Keep a match open beyond five minutes. Vercel closes sockets at the configured function-duration limit; check that the client reconnects and room membership is restored.
+4. Try voice opt-in and a Wi-Fi/mobile-data switch. Inspect `/ws` on the game domain and check for connection/storage errors.
+5. Check Settings > About, `/privacy.html`, saves after reopening, and iPhone Share > Add to Home Screen.
 
-Local verification: `npm run lint`, `npm run test:vercel`, `npm run test:deployment`, `npm run test:multiplayer`, `npm run test:custom-volleyball`, `npm run build:server`, and `npm run build`. The Vercel tests use actual local HTTP, WebSockets and streaming fetch against a disposable Redis emulator; they do not prove hosted routing, provider credentials, load capacity or physical-device performance.
+Local checks: `npm run lint`, `npm run test:vercel`, `npm run test:deployment`, `npm run test:multiplayer`, `npm run test:custom-volleyball`, `npm run build:server`, and `npm run build`. The Vercel test uses the real Atlas adapter with an in-memory MongoDB collection/change-stream boundary plus actual local HTTP/WebSockets. It covers atomic conflicts, room/event delivery, reconnect, host transfer, namespace isolation, expiration and sanitized failures. It does not connect to a real Atlas cluster or measure load capacity/physical-device performance.
 
-## Operational behavior
+The game is at `/`, its standalone policy is at `/privacy.html`, and Settings > About contains the policy and ArsDev YouTube credit. Browser saves remain tied to the browser and website origin.
 
-Abandoned clients expire after 90 seconds and are removed during the next state update. The shared room document expires after two hours without a write. Redis keeps active rooms across function restarts; it does not preserve a room after storage expires. Gameplay scores remain host-owned, so a disconnected match host can interrupt the match even while membership survives. Player IDs are temporary, not authenticated accounts, and this casual-game setup is not an anti-cheat service.
+## Expiration and operational limits
 
-`server.ts` and the existing `render.yaml` remain available for optional standalone hosting and local development. Only that alternate setup uses `VITE_MULTIPLAYER_URL`, exact-origin allowlisting, and an always-on server. It is not part of the Vercel + Redis setup above.
+Abandoned clients expire after 90 seconds and are removed during the next state update. The room document expires after two hours without a write. Relay packets expire after 30 seconds; the Atlas TTL index cleans up expired documents asynchronously, and the adapter immediately ignores expired records/packets even before physical deletion. TTL is temporary cleanup, not a game replay/archive feature.
+
+Active rooms survive function restarts while their database state remains valid. Scores remain host-owned; a disconnected match host can interrupt play even while room membership survives. Atlas may pause an unused Free cluster after 30 days without connections. Player IDs are temporary, not authenticated accounts, and this is a casual-game setup rather than an anti-cheat service.
+
+`server.ts` and `render.yaml` remain available for local development and optional standalone hosting. Only that alternate setup uses an external VITE_MULTIPLAYER_URL and an always-on server.
 
 ## References
 
-- [Vercel WebSockets, server exports and reconnect behavior](https://vercel.com/docs/functions/websockets)
-- [Upstash Redis pricing](https://upstash.com/pricing/redis)
+- [Vercel WebSockets and reconnect behavior](https://vercel.com/docs/functions/websockets)
+- [Create an Atlas Free cluster](https://www.mongodb.com/docs/atlas/tutorial/deploy-free-tier-cluster/)
+- [Atlas Vercel integration](https://www.mongodb.com/docs/atlas/reference/partner-integrations/vercel/)
+- [Atlas Free limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/)
 - [Cloudflare TURN credential generation](https://developers.cloudflare.com/realtime/turn/generate-credentials/)

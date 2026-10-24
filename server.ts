@@ -369,7 +369,8 @@ async function startServer() {
 
   app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
-  app.use(express.json());
+  // Game clients send plain JSON; reject compressed bodies before decompression.
+  app.use(express.json({ inflate: false }));
 
   app.get('/api/health', (_req, res) => {
     res.json({
