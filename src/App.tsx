@@ -45,6 +45,7 @@ import { LandscapePrompt } from './components/LandscapePrompt';
 import { LoadingScreen } from './components/LoadingScreen';
 import { VolleyballCanvas } from './components/VolleyballCanvas';
 import { GunFightKillNotice, GunFightScore } from './components/GunFightHud';
+import { backgroundAudioScene } from './audio/audioScene';
 import { PausePanel, MatchResults } from './components/MatchPanels';
 import { ActualMapThumbnail } from './components/ActualMapThumbnail';
 import { ProfilePanel } from './components/ProfilePanel';
@@ -1114,12 +1115,12 @@ export function App() {
     if (!next) crayonAudio.playMenuClick();
   };
 
-  // Quiet original music in menus and matches; pause screens and hidden tabs stay silent.
+  // One menu session across Settings, Modes, Profile, Customize and room screens.
+  const audioScene = backgroundAudioScene(canvasGameState, splashDismissed);
   useEffect(() => {
-    crayonAudio.setVolleyballNatureAmbience(false);
-    crayonAudio.setBackgroundMusic(splashDismissed && canvasGameState !== 'PAUSED');
-    return () => crayonAudio.setBackgroundMusic(false);
-  }, [canvasGameState, splashDismissed]);
+    crayonAudio.setAudioScene(audioScene);
+  }, [audioScene]);
+  useEffect(() => () => crayonAudio.setAudioScene('silent'), []);
 
   const handleAddCallout = useCallback(
     (popup: {
@@ -2412,7 +2413,9 @@ export function App() {
       {/* ===================================================================== */}
       {gameState === 'PLAYING' && (
         <div className="gameplay-hud fixed inset-0 z-30 flex flex-col justify-between p-2 sm:p-3 safe-pad pointer-events-none">
-          {gameMode === 'obstacle_rush' && <GunFightKillNotice key={rushRunKey} kills={rushHud.playerKills ?? 0} />}
+          {(gameMode === 'obstacle_rush' || gameMode === 'floor_is_lava') && (
+            <GunFightKillNotice key={`${gameMode}-${rushRunKey}`} kills={(gameMode === 'obstacle_rush' ? rushHud.playerKills : lavaHud.playerKills) ?? 0} />
+          )}
           {/* TOP BAR: Compact Neutral Frosted Glassmorphic HUD */}
           <div className="gameplay-topbar relative z-10">
             {/* Top-Left: Compact Glassmorphic Audio + Voice Mic Controls */}

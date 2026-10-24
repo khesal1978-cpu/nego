@@ -2532,18 +2532,10 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
                   victim.heldBallId = null;
                 }
                 if (thrower) thrower.kills += 1;
-                crayonAudio.playScoreCheer();
-                bannerText = `${thrower ? thrower.name : 'Nuke'} ELIMINATED ${victim.name}!`;
-                bannerTimer = 2.6;
-
-                if (thrower?.isPlayer) {
-                  onCalloutRef.current?.(
-                    `ELIMINATED ${victim.name.toUpperCase()}!`,
-                    '#FACC15'
-                  );
-                } else if (victim.isPlayer) {
-                  onCalloutRef.current?.('ELIMINATED!', '#FB7185');
-                }
+                // Local kill count gets the shared one-second red confirmation.
+                // Round information continues through the existing round HUD.
+                bannerText = null;
+                bannerTimer = 0;
               } else {
                 const hitsLeft = Math.ceil(victim.hp / 40);
                 if (victim.isPlayer) {

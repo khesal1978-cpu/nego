@@ -3,6 +3,7 @@
 // for zero-latency shooter firearms, human hurt/death vocalizations, and realistic leather volleyball impacts.
 
 import { createOriginalMusic } from './originalMusic';
+import type { AudioScene } from './audioScene';
 
 type SfxSampleKey =
   | 'assault_rifle'
@@ -28,6 +29,8 @@ const FEMALE_CHARACTER_IDS = new Set([
 
 class CrayonAudioEngine {
   private ctx: AudioContext | null = null;
+  private sfxInput: BiquadFilterNode | null = null;
+  private sfxOutput: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private sampleBuffers: Map<SfxSampleKey, AudioBuffer> = new Map();
   private rawArrayBuffers: Map<SfxSampleKey, ArrayBuffer> = new Map();
@@ -52,9 +55,8 @@ class CrayonAudioEngine {
   private lastHitMarkerTime: number = 0;
   private activeHurtSources: Set<AudioBufferSourceNode> = new Set();
 
-  // Background forest birds & nature ambience state (5% volume in Volleyball, 2% volume in Gun Fight)
+  // The original forest recording is the only background loop during matches.
   private natureAmbienceWanted: boolean = false;
-  private natureAmbienceBaseVolume: number = 0.05;
   private natureSourceNode: AudioBufferSourceNode | null = null;
   private natureGainNode: GainNode | null = null;
 
@@ -66,7 +68,7 @@ class CrayonAudioEngine {
       const unlock = () => { this.getContext(); };
       window.addEventListener('pointerdown', unlock, { once: true, passive: true });
       window.addEventListener('keydown', unlock, { once: true });
-      if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.syncBackgroundMusic());
+      if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.syncVolleyballNatureAmbienceVolume());
     }
   }
 
@@ -124,7 +126,7 @@ class CrayonAudioEngine {
       .then((decoded) => {
         this.sampleBuffers.set(key, decoded);
         if (key === 'birds_forest_nature' && this.natureAmbienceWanted && this.ctx) {
-          this.restartNatureLoopWithBuffer(this.ctx, decoded);
+          this.syncNatureAmbience();
         }
       })
       .catch(() => { this.decoding.delete(key); });
@@ -139,6 +141,7 @@ class CrayonAudioEngine {
           .webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+        this.initSfxMix(this.ctx);
         this.initInstantPcmSamples(this.ctx);
         this.preloadWavFiles(this.ctx);
       }
@@ -146,22 +149,37 @@ class CrayonAudioEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
-    if (this.natureAmbienceWanted && !this.natureSourceNode && this.ctx) {
-      this.startNatureLoopInternal(this.ctx);
-    }
-    this.syncBackgroundMusic();
+    this.syncVolleyballNatureAmbienceVolume();
     return this.ctx;
   }
 
-  public setBackgroundMusic(active: boolean) {
-    this.musicWanted = active;
-    this.syncBackgroundMusic();
+  public setAudioScene(scene: AudioScene) {
+    this.musicWanted = scene === 'menu';
+    this.natureAmbienceWanted = scene === 'game';
+    this.syncVolleyballNatureAmbienceVolume();
   }
 
   public syncBackgroundMusic() {
     if (!this.ctx) return; // Starts only after the existing user-gesture audio unlock.
     this.originalMusic ??= createOriginalMusic(this.ctx);
     this.originalMusic.set(this.musicWanted && !this.muted && !(typeof document !== 'undefined' && document.hidden), this.musicVolume);
+  }
+
+  private initSfxMix(ctx: AudioContext) {
+    const rumble = ctx.createBiquadFilter();
+    rumble.type = 'highpass'; rumble.frequency.value = 35; rumble.Q.value = .5;
+    const presence = ctx.createBiquadFilter();
+    presence.type = 'peaking'; presence.frequency.value = 2800; presence.Q.value = .7; presence.gain.value = -4.5;
+    const air = ctx.createBiquadFilter();
+    air.type = 'lowpass'; air.frequency.value = 9000; air.Q.value = .5;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -16; compressor.knee.value = 18; compressor.ratio.value = 4;
+    compressor.attack.value = .004; compressor.release.value = .12;
+    const output = ctx.createGain();
+    output.gain.value = this.muted ? 0 : this.sfxVolume * .78;
+    rumble.connect(presence); presence.connect(air); air.connect(compressor);
+    compressor.connect(output); output.connect(ctx.destination);
+    this.sfxInput = rumble; this.sfxOutput = output;
   }
 
   /**
@@ -259,9 +277,13 @@ class CrayonAudioEngine {
     for (const key of ['assault_rifle', 'shotgun_blast'] as const) {
       const buffer = ctx.createBuffer(1, Math.floor(sr * .18), sr);
       const out = buffer.getChannelData(0);
+      const raw = new Float32Array(out.length);
+      for (let i = 0; i < raw.length; i++) raw[i] = Math.random() * 2 - 1;
+      const body = this.filterPcm(raw, sr, 'lowpass', 3200, .5);
       for (let i = 0; i < out.length; i++) {
         const t = i / sr;
-        out[i] = ((Math.random() * 2 - 1) * .65 + Math.sin(t * 2 * Math.PI * 95) * .35) * Math.exp(-t * (key === 'shotgun_blast' ? 28 : 42));
+        out[i] = (body[i] * .5 + Math.sin(t * 2 * Math.PI * 95) * .35)
+          * Math.min(1, t / .002) * Math.exp(-t * (key === 'shotgun_blast' ? 28 : 42));
       }
       this.sampleBuffers.set(key, buffer);
     }
@@ -374,45 +396,34 @@ class CrayonAudioEngine {
   }
 
   /**
-   * Starts or stops the 5% volume background Forest Birds & Nature ambience for both Volleyball and Gun Fight!
-   */
-  public setVolleyballNatureAmbience(active: boolean, baseVolume: number = 0.05) {
-    this.natureAmbienceWanted = active;
-    this.natureAmbienceBaseVolume = baseVolume;
-    if (!active || this.muted) {
-      this.stopNatureLoopInternal();
-      return;
-    }
-    const ctx = this.getContext();
-    if (ctx) {
-      this.startNatureLoopInternal(ctx);
-      this.syncVolleyballNatureAmbienceVolume();
-    }
-  }
-
-  /**
-   * Keeps the background forest birds music volume at ~5% in both Volleyball and Gun Fight!
+   * Applies sliders/mute to the current scene and to already-playing effects.
    */
   public syncVolleyballNatureAmbienceVolume() {
     this.syncBackgroundMusic();
-    if (this.muted || !this.natureAmbienceWanted) {
+    this.syncNatureAmbience();
+    if (this.ctx && this.sfxOutput) {
+      this.sfxOutput.gain.setTargetAtTime(this.muted ? 0 : Math.max(0, Math.min(1, this.sfxVolume)) * .78, this.ctx.currentTime, .025);
+    }
+  }
+
+  private natureVolume() {
+    // Default 30% slider restores the original 5%; higher settings never amplify it.
+    return .05 * Math.min(1, Math.max(0, this.musicVolume / .3));
+  }
+
+  private syncNatureAmbience() {
+    if (this.muted || !this.natureAmbienceWanted || this.musicVolume <= 0 || (typeof document !== 'undefined' && document.hidden)) {
       this.stopNatureLoopInternal();
       return;
     }
+    if (!this.ctx) return;
+    this.startNatureLoopInternal(this.ctx);
     if (this.natureGainNode && this.ctx) {
-      const musicSliderScale = Math.min(1.5, Math.max(0, this.musicVolume / 0.65));
-      const targetGain =
-        this.musicVolume <= 0.01
-          ? 0.0001
-          : this.natureAmbienceBaseVolume * musicSliderScale;
       this.natureGainNode.gain.setTargetAtTime(
-        targetGain,
+        this.natureVolume(),
         this.ctx.currentTime,
         0.15
       );
-    } else if (this.natureAmbienceWanted && !this.natureSourceNode) {
-      const ctx = this.getContext();
-      if (ctx) this.startNatureLoopInternal(ctx);
     }
   }
 
@@ -426,13 +437,8 @@ class CrayonAudioEngine {
     src.loop = true;
 
     const gain = ctx.createGain();
-    const musicSliderScale = Math.min(1.5, Math.max(0, this.musicVolume / 0.65));
-    const targetGain =
-      this.muted || this.musicVolume <= 0.01
-        ? 0.0001
-        : this.natureAmbienceBaseVolume * musicSliderScale;
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.35);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.setTargetAtTime(this.natureVolume(), ctx.currentTime, 0.15);
 
     src.connect(gain);
     gain.connect(ctx.destination);
@@ -440,14 +446,6 @@ class CrayonAudioEngine {
 
     this.natureSourceNode = src;
     this.natureGainNode = gain;
-  }
-
-  private restartNatureLoopWithBuffer(ctx: AudioContext, buffer: AudioBuffer) {
-    this.stopNatureLoopInternal();
-    this.sampleBuffers.set('birds_forest_nature', buffer);
-    if (this.natureAmbienceWanted && !this.muted) {
-      this.startNatureLoopInternal(ctx);
-    }
   }
 
   private stopNatureLoopInternal() {
@@ -492,7 +490,7 @@ class CrayonAudioEngine {
     gain.gain.setValueAtTime(this.scaleGain(volume), ctx.currentTime);
 
     src.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.sfxInput!);
     if (trackAsHurt) {
       this.activeHurtSources.add(src);
     }
@@ -531,9 +529,9 @@ class CrayonAudioEngine {
     return buffer;
   }
 
-  private scaleGain(base: number, isMusic: boolean = false): number {
-    const mult = isMusic ? this.musicVolume : this.sfxVolume;
-    return Math.max(0.0005, base * Math.max(0, Math.min(1, mult)));
+  private scaleGain(base: number): number {
+    // Effects volume is applied once, after compression, including live voices.
+    return Math.max(0.0001, base);
   }
 
   /**
@@ -610,8 +608,8 @@ class CrayonAudioEngine {
     if (!ctx || this.sfxVolume <= 0.01) return;
 
     // 1. Punchy ball smack + flesh hit marker
-    this.playSample('bullet_hit', isSuper ? 0.58 : 0.46, 0.94 + Math.random() * 0.08);
-    this.playSample('ball_spike', isSuper ? 0.68 : 0.52, 0.88 + Math.random() * 0.08);
+    this.playSample('bullet_hit', isSuper ? 0.32 : 0.24, 0.94 + Math.random() * 0.08);
+    this.playSample('ball_spike', isSuper ? 0.48 : 0.36, 0.88 + Math.random() * 0.08);
 
     // 2. Guaranteed Hurt or KO Voice so every Dodgeball hit feels impactful!
     const isFemale = this.isFemaleCharacter(victimCharId);
@@ -619,12 +617,12 @@ class CrayonAudioEngine {
       this.stopActiveHurtSounds();
       this.playSample(
         isFemale ? 'female_death' : 'player_death',
-        0.85,
+        0.58,
         0.98 + Math.random() * 0.04
       );
     } else {
       const sampleKey: SfxSampleKey = isFemale ? 'female_hurt' : 'male_hurt';
-      this.playSample(sampleKey, 0.55, 0.98 + Math.random() * 0.05, true);
+      this.playSample(sampleKey, 0.4, 0.98 + Math.random() * 0.05, true);
     }
   }
 
@@ -651,11 +649,13 @@ class CrayonAudioEngine {
     osc.frequency.setValueAtTime(115, now);
     osc.frequency.exponentialRampToValueAtTime(65, now + 0.055);
 
-    gain.gain.setValueAtTime(this.scaleGain(0.14), now);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(this.scaleGain(0.14), now + .004);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.sfxInput!);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
     osc.start(now);
     osc.stop(now + 0.065);
   }
@@ -681,10 +681,12 @@ class CrayonAudioEngine {
     const pitch = 95 + Math.random() * 18;
     osc.frequency.setValueAtTime(pitch, now);
     osc.frequency.exponentialRampToValueAtTime(42, now + 0.038);
-    gain.gain.setValueAtTime(this.scaleGain(0.09), now);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(this.scaleGain(0.09), now + .004);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.sfxInput!);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
     osc.start(now);
     osc.stop(now + 0.045);
   }
@@ -700,24 +702,7 @@ class CrayonAudioEngine {
    * GUN FIGHT: Medkit Health Pickup Chime (+HP)
    */
   public playMedkitPickup() {
-    const ctx = this.getContext();
-    if (!ctx || this.sfxVolume <= 0.01) return;
-
-    const now = ctx.currentTime;
-    const healNotes = [523.25, 659.25];
-    healNotes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      const start = now + idx * 0.045;
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(this.scaleGain(0.14), start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.18);
-    });
+    this.playSoftAccent([392, 493.88], .09, .16);
   }
 
   /**
@@ -745,37 +730,14 @@ class CrayonAudioEngine {
       gain.gain.setValueAtTime(.0001, start);
       gain.gain.linearRampToValueAtTime(this.scaleGain(volume), start + .008);
       gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
-      osc.connect(gain); gain.connect(ctx.destination);
+      osc.connect(gain); gain.connect(this.sfxInput!);
       osc.onended = () => { osc.disconnect(); gain.disconnect(); };
       osc.start(start); osc.stop(start + duration + .01);
     });
   }
 
   public playPointScored(playerWonPoint: boolean) {
-    const ctx = this.getContext();
-    if (!ctx || this.musicVolume <= 0.01) return;
-
-    const now = ctx.currentTime;
-    const notes = playerWonPoint
-      ? [523.25, 659.25, 783.99]
-      : [392.0, 311.13, 261.63];
-
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      const startTime = now + idx * 0.075;
-      osc.frequency.setValueAtTime(freq, startTime);
-
-      gain.gain.setValueAtTime(this.scaleGain(0.22, true), startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.24);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(startTime);
-      osc.stop(startTime + 0.26);
-    });
+    this.playSoftAccent(playerWonPoint ? [392, 493.88, 587.33] : [329.63, 293.66, 261.63], .08, .2);
   }
 
   public playStarCollect() {
@@ -792,10 +754,12 @@ class CrayonAudioEngine {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(520, now);
     osc.frequency.exponentialRampToValueAtTime(720, now + 0.03);
-    gain.gain.setValueAtTime(this.scaleGain(0.09), now);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(this.scaleGain(0.09), now + .004);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.038);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.sfxInput!);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
     osc.start(now);
     osc.stop(now + 0.042);
   }
@@ -812,21 +776,7 @@ class CrayonAudioEngine {
    * VOLLEYBALL: Referee Whistle on Serve
    */
   public playServeWhistle() {
-    const ctx = this.getContext();
-    if (!ctx || this.sfxVolume <= 0.01) return;
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(2150, now);
-    osc.frequency.setValueAtTime(2260, now + 0.04);
-    gain.gain.setValueAtTime(this.scaleGain(0.22), now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    this.playSoftAccent([784], .055, .12);
   }
 
   public playSpikeBoom() {
@@ -884,12 +834,14 @@ class CrayonAudioEngine {
     filter.Q.setValueAtTime(0.5, now);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(this.scaleGain(volScale), now);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(this.scaleGain(volScale), now + .004);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
 
     noiseSrc.connect(filter);
     filter.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.sfxInput!);
+    noiseSrc.onended = () => { noiseSrc.disconnect(); filter.disconnect(); gain.disconnect(); };
     noiseSrc.start(now);
     noiseSrc.stop(now + 0.1);
   }
@@ -929,7 +881,7 @@ class CrayonAudioEngine {
       ? 'female_hurt'
       : 'male_hurt';
     const rate = 0.98 + Math.random() * 0.04;
-    this.playSample(sampleKey, 0.54, rate, true);
+    this.playSample(sampleKey, 0.4, rate, true);
   }
 
   /**
@@ -948,7 +900,7 @@ class CrayonAudioEngine {
       ? 'female_hurt'
       : 'male_hurt';
     const rate = 0.98 + Math.random() * 0.05;
-    this.playSample(sampleKey, 0.36, rate, true);
+    this.playSample(sampleKey, 0.28, rate, true);
   }
 
   /**
@@ -979,7 +931,7 @@ class CrayonAudioEngine {
         this.kaunHaiRePlayedCount += 1;
         this.lastKaunHaiReTime = now;
         this.lastDeathSoundTime = now;
-        this.playSample('kaun_hai_re', 0.95, 1.0);
+        this.playSample('kaun_hai_re', 0.7, 1.0);
         return;
       }
 
@@ -988,7 +940,7 @@ class CrayonAudioEngine {
       const isFemale = this.isFemaleCharacter(charId);
       this.playSample(
         isFemale ? 'female_death' : 'player_death',
-        0.88,
+        0.6,
         0.98 + Math.random() * 0.04
       );
       return;
@@ -1003,7 +955,7 @@ class CrayonAudioEngine {
 
     const isFemale = this.isFemaleCharacter(charId);
     const sampleKey: SfxSampleKey = isFemale ? 'female_death' : 'player_death';
-    this.playSample(sampleKey, 0.85, 0.98 + Math.random() * 0.05);
+    this.playSample(sampleKey, 0.58, 0.98 + Math.random() * 0.05);
   }
 
   /**
@@ -1031,56 +983,11 @@ class CrayonAudioEngine {
    * GUN FIGHT: Gentle 3-2-1 Countdown Beep & "FIGHT!" / Overtime Chord
    */
   public playCountdownBeep(isFinalGo: boolean = false) {
-    const ctx = this.getContext();
-    if (!ctx || this.sfxVolume <= 0.01) return;
-
-    const now = ctx.currentTime;
-    if (isFinalGo) {
-      [523.25, 659.25, 783.99].forEach((freq) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(this.scaleGain(0.16), now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.27);
-      });
-    } else {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, now);
-      gain.gain.setValueAtTime(this.scaleGain(0.14), now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
-    }
+    this.playSoftAccent(isFinalGo ? [392, 493.88, 587.33] : [392], .09, isFinalGo ? .22 : .1);
   }
 
   public playVictoryFanfare() {
-    const ctx = this.getContext();
-    if (!ctx || this.musicVolume <= 0.01) return;
-
-    const now = ctx.currentTime;
-    const fanfare = [523.25, 659.25, 783.99, 1046.5];
-    fanfare.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      const start = now + idx * 0.085;
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(this.scaleGain(0.16, true), start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.34);
-    });
+    this.playSoftAccent([392, 493.88, 587.33, 784], .085, .26);
   }
 
   public playLoseStinger() {

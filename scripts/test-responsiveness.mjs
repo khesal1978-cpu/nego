@@ -208,13 +208,15 @@ transceiver.currentDirection = 'recvonly'; assert(!client.hasDirectAudio('peer',
 
 // Mock only the audio device: all engine loading/scheduling code runs unchanged.
 const requests = [], started = [], contexts = [], listeners = new Map();
-const param = () => ({ setValueAtTime() {}, setTargetAtTime() {}, exponentialRampToValueAtTime() {} });
+const param = () => ({ value: 0, setValueAtTime() {}, setTargetAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} });
 class AudioContextMock {
   constructor(options) { this.options = options; this.currentTime = 20; this.sampleRate = 8000; this.state = 'running'; this.destination = {}; this.decoded = 0; contexts.push(this); }
   createBuffer(channels, length, sampleRate) { const data = Array.from({ length: channels }, () => new Float32Array(length)); return { sampleRate, getChannelData: i => data[i] }; }
   decodeAudioData() { this.decoded++; return Promise.resolve(this.createBuffer(1, 20, 8000)); }
   createBufferSource() { return { playbackRate: param(), connect() {}, disconnect() {}, stop() {}, start(at) { started.push({ at, buffer: this.buffer }); } }; }
   createGain() { return { gain: param(), connect() {}, disconnect() {} }; }
+  createBiquadFilter() { return { frequency: param(), Q: param(), gain: param(), connect() {} }; }
+  createDynamicsCompressor() { return { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), connect() {} }; }
   resume() { return Promise.resolve(); }
 }
 const audio = load(`export { crayonAudio } from './src/audio/crayonAudio';`, {

@@ -27,6 +27,8 @@
     "test:response": "node scripts/test-responsiveness.mjs",
     "test:mobile": "node scripts/test-mobile-interactions.mjs",
     "test:saved-quality-audio": "node scripts/test-saved-quality-audio.mjs",
+    "test:audio-scenes": "node scripts/test-audio-scenes.mjs",
+    "test:kill-notice": "node scripts/test-kill-notice.mjs",
     "test:custom-volleyball": "node scripts/test-custom-volleyball.mjs",
     "test:low-end": "node scripts/test-low-end.mjs",
     "test:deployment": "node scripts/test-deployment.mjs",
