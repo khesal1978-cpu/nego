@@ -2,7 +2,7 @@
 // Loads and plays 44.1kHz 16-bit PCM WAV SFX from /sfx/*.wav with instant in-memory PCM sample buffers
 // for zero-latency shooter firearms, human hurt/death vocalizations, and realistic leather volleyball impacts.
 
-import { createOriginalMusic } from './originalMusic';
+import { createMenuMusic } from './menuMusic';
 import type { AudioScene } from './audioScene';
 
 type SfxSampleKey =
@@ -40,7 +40,7 @@ class CrayonAudioEngine {
   public muted: boolean = false;
   public sfxVolume: number = 0.8;
   public musicVolume: number = 0.3;
-  private originalMusic: ReturnType<typeof createOriginalMusic> | null = null;
+  private menuMusic: ReturnType<typeof createMenuMusic> | null = null;
   private musicWanted = false;
   private lastFootstepTime: number = 0;
   private lastHurtTime: number = 0;
@@ -161,8 +161,8 @@ class CrayonAudioEngine {
 
   public syncBackgroundMusic() {
     if (!this.ctx) return; // Starts only after the existing user-gesture audio unlock.
-    this.originalMusic ??= createOriginalMusic(this.ctx);
-    this.originalMusic.set(this.musicWanted && !this.muted && !(typeof document !== 'undefined' && document.hidden), this.musicVolume);
+    this.menuMusic ??= createMenuMusic(this.ctx);
+    this.menuMusic.set(this.musicWanted && !this.muted && !(typeof document !== 'undefined' && document.hidden), this.musicVolume);
   }
 
   private initSfxMix(ctx: AudioContext) {

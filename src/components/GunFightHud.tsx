@@ -21,7 +21,7 @@ export function GunFightKillNotice({ kills }: { kills: number }) {
     previousKills.current = kills;
     setVisible(earnedKill);
     if (!earnedKill) return;
-    const timer = window.setTimeout(() => setVisible(false), 1000);
+    const timer = window.setTimeout(() => setVisible(false), 1500);
     return () => window.clearTimeout(timer);
   }, [kills]);
 

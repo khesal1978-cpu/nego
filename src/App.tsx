@@ -1741,6 +1741,8 @@ export function App() {
               >
                 <svg
                   viewBox="0 0 460 220"
+                  role="img"
+                  aria-label="SIXGUN"
                   className="w-full h-auto overflow-visible drop-shadow-[0_12px_20px_rgba(4,16,30,0.48)]"
                 >
                   <defs>
@@ -1779,12 +1781,12 @@ export function App() {
 
                   <g transform="rotate(-4 225 108)">
                     <path
-                      d="M 28 66 L 398 54 L 382 140 L 14 146 Z"
+                      d="M 37 68 L 382 56 Q 400 55 395 72 L 383 129 Q 380 141 366 142 L 29 152 Q 12 153 16 136 L 25 82 Q 27 70 37 68 Z"
                       fill="#04101E"
                       opacity="0.42"
                     />
                     <path
-                      d="M 34 61 L 392 50 L 378 134 L 20 140 Z"
+                      d="M 43 62 L 376 52 Q 393 51 389 68 L 377 121 Q 374 134 361 135 L 36 145 Q 19 145 22 128 L 30 76 Q 32 64 43 62 Z"
                       fill="#071D35"
                       stroke="#38BDF8"
                       strokeWidth="3"
@@ -1831,10 +1833,12 @@ export function App() {
                         x="210"
                         y={122 + depthOffset}
                         textAnchor="middle"
-                        fontFamily="'Rubik', 'Outfit', sans-serif"
+                        fontFamily="'Outfit', 'Arial Rounded MT Bold', sans-serif"
                         fontWeight="900"
-                        fontStyle="italic"
-                        fontSize="78"
+                        fontStyle="normal"
+                        textLength="320"
+                      lengthAdjust="spacingAndGlyphs"
+                      fontSize="78"
                         letterSpacing="3"
                         paintOrder="stroke fill"
                         stroke="#04101E"
@@ -1851,9 +1855,11 @@ export function App() {
                       x="210"
                       y="126"
                       textAnchor="middle"
-                      fontFamily="'Rubik', 'Outfit', sans-serif"
+                      fontFamily="'Outfit', 'Arial Rounded MT Bold', sans-serif"
                       fontWeight="900"
-                      fontStyle="italic"
+                      fontStyle="normal"
+                      textLength="320"
+                      lengthAdjust="spacingAndGlyphs"
                       fontSize="78"
                       letterSpacing="3"
                       paintOrder="stroke fill"
@@ -1870,9 +1876,11 @@ export function App() {
                       x="210"
                       y="121"
                       textAnchor="middle"
-                      fontFamily="'Rubik', 'Outfit', sans-serif"
+                      fontFamily="'Outfit', 'Arial Rounded MT Bold', sans-serif"
                       fontWeight="900"
-                      fontStyle="italic"
+                      fontStyle="normal"
+                      textLength="320"
+                      lengthAdjust="spacingAndGlyphs"
                       fontSize="78"
                       letterSpacing="3"
                       paintOrder="stroke fill"
@@ -1889,9 +1897,11 @@ export function App() {
                       x="210"
                       y="121"
                       textAnchor="middle"
-                      fontFamily="'Rubik', 'Outfit', sans-serif"
+                      fontFamily="'Outfit', 'Arial Rounded MT Bold', sans-serif"
                       fontWeight="900"
-                      fontStyle="italic"
+                      fontStyle="normal"
+                      textLength="320"
+                      lengthAdjust="spacingAndGlyphs"
                       fontSize="78"
                       letterSpacing="3"
                       fill="rgba(255,255,255,0.32)"
@@ -1901,7 +1911,7 @@ export function App() {
                       SIXGUN
                     </text>
 
-                    <g transform="translate(396, 86) rotate(12)">
+                    <g transform="translate(418, 86) rotate(12)">
                       <circle cx="0" cy="4.5" r="25" fill="#04101E" />
                       <g clipPath="url(#sixgun_ball_clip)">
                         <circle cx="0" cy="0" r="24" fill="#F8FAFC" />
@@ -1970,7 +1980,7 @@ export function App() {
                         x="0"
                         y="9"
                         textAnchor="middle"
-                        fontFamily="'Rubik', 'Outfit', sans-serif"
+                        fontFamily="'Outfit', 'Arial Rounded MT Bold', sans-serif"
                         fontWeight="900"
                         fontSize="20"
                         letterSpacing="3.5"

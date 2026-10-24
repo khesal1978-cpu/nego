@@ -12,14 +12,27 @@ class AudioContextMock {
   createBuffer(channels, length, sampleRate) { const data = Array.from({ length: channels }, () => new Float32Array(length)); return { length, sampleRate, getChannelData: i => data[i] }; }
   decodeAudioData(bytes) { return Promise.resolve({ asset: new TextDecoder().decode(bytes) }); }
   createBufferSource() { const n = Object.assign(node('sample'), { playbackRate: param(), start() { this.started = true; sources.push(this); }, stop() { this.stopped = true; } }); return n; }
+  createMediaElementSource(track) {
+    const n = Object.assign(node('media'), { buffer: { asset: track.src }, loop: true });
+    Object.defineProperty(n, 'stopped', { get: () => track.paused });
+    sources.push(n); return n;
+  }
   createGain() { return Object.assign(node('gain'), { gain: param() }); }
   createBiquadFilter() { return Object.assign(node('filter'), { frequency: param(), Q: param(), gain: param() }); }
   createDynamicsCompressor() { return Object.assign(node('compressor'), { threshold: param(), knee: param(), ratio: param(), attack: param(), release: param() }); }
   createOscillator() { return Object.assign(node('oscillator'), { frequency: param(), start() {}, stop() {} }); }
   resume() { return Promise.resolve(); }
 }
+let menuTrack;
+class AudioMock {
+  constructor(src) { menuTrack = this; this.src = src; this.paused = true; this.playCount = 0; this.currentTime = 0; }
+  play() { this.paused = false; this.playCount++; return Promise.resolve(); }
+  pause() { this.paused = true; }
+  removeAttribute() {}
+  load() {}
+}
 const code = buildSync({ stdin: { contents: `export { crayonAudio } from './src/audio/crayonAudio'; export * from './src/audio/audioScene';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, logLevel: 'silent' }).outputFiles[0].text;
-const context = { module: { exports: {} }, document, window: { AudioContext: AudioContextMock, addEventListener: (name, callback) => events.set(name, callback) }, setTimeout: callback => timers.push(callback), fetch: url => new Promise(resolve => pendingAssets.set(url, () => resolve({ ok: true, arrayBuffer: () => Promise.resolve(new TextEncoder().encode(url).buffer) }))) };
+const context = { module: { exports: {} }, document, Audio: AudioMock, window: { AudioContext: AudioContextMock, addEventListener: (name, callback) => events.set(name, callback) }, setTimeout: callback => timers.push(callback), fetch: url => new Promise(resolve => pendingAssets.set(url, () => resolve({ ok: true, arrayBuffer: () => Promise.resolve(new TextEncoder().encode(url).buffer) }))) };
 vm.runInNewContext(code, context);
 const { crayonAudio: audio, backgroundAudioScene: scene } = context.module.exports;
 const flush = () => { while (timers.length) timers.shift()(); };
@@ -29,15 +42,24 @@ const menuScreens = ['TITLE_MENU', 'SETTINGS', 'MODE_SELECT', 'CHARACTER_SELECT'
 audio.setAudioScene(scene('TITLE_MENU', true));
 assert.equal(sources.length, 0, 'Music waits for user-gesture unlock');
 events.get('pointerdown')(); flush();
+await Promise.resolve();
 const menu = loops()[0];
 assert(menu && loops().length === 1);
+assert.equal(menu.buffer.asset, '/music/ship-wrek-pain.mp3', 'Menu streams the supplied Ship Wrek recording');
+assert.equal(menu.connections[0].gain.value, .075, 'Default menu mix is quiet');
+menuTrack.currentTime = 42;
 for (let i = 0; i < 3; i++) for (const screen of menuScreens) {
   audio.setAudioScene(scene(screen, true)); audio.playMenuClick();
   assert.equal(loops()[0], menu, `Menu music keeps its source/position in ${screen}`);
 }
+assert.equal(menuTrack.playCount, 1, 'Screen navigation never restarts the track');
+assert.equal(menuTrack.currentTime, 42, 'Screen navigation preserves song position');
+audio.musicVolume = 1; audio.syncBackgroundMusic(); assert.equal(menu.connections[0].gain.value, .2, 'Menu gain stays capped');
+audio.musicVolume = .3;
 audio.setAudioScene(scene('PLAYING', true));
 assert(menu.stopped && !loops().length, 'Menu music stops immediately when a match starts, even before forest fetch completes');
 audio.setAudioScene('menu');
+await Promise.resolve();
 for (const resolve of pendingAssets.values()) resolve();
 await new Promise(resolve => setImmediate(resolve));
 assert.equal(loops().length, 1); assert(!nature(), 'A late forest decode never starts in a menu');
