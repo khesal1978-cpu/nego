@@ -44,7 +44,7 @@ import { VoiceMicControl } from './components/VoiceMicControl';
 import { LandscapePrompt } from './components/LandscapePrompt';
 import { LoadingScreen } from './components/LoadingScreen';
 import { VolleyballCanvas } from './components/VolleyballCanvas';
-import { GunFightScore } from './components/GunFightHud';
+import { GunFightKillNotice, GunFightScore } from './components/GunFightHud';
 import { PausePanel, MatchResults } from './components/MatchPanels';
 import { ActualMapThumbnail } from './components/ActualMapThumbnail';
 import { ProfilePanel } from './components/ProfilePanel';
@@ -1586,9 +1586,9 @@ export function App() {
       {/* COZY CRAYON POST-PROCESSING VIGNETTE OVERLAY */}
       <div className="crayon-postfx fixed inset-0 z-10 pointer-events-none" />
 
-      {/* CLEAN NORMAL WHITE FLOATING CALLOUT TEXT (Original crisp white text style!) */}
+      {/* Subtle volleyball highlights and point announcements. */}
       {gameState === 'PLAYING' && showCallouts && gameMode !== 'obstacle_rush' && (
-        <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden">
+        <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden" style={{ opacity: gameMode === 'floor_is_lava' ? 1 : .6 }}>
           {callouts.map((c) => (
             <div
               key={c.id}
@@ -2412,6 +2412,7 @@ export function App() {
       {/* ===================================================================== */}
       {gameState === 'PLAYING' && (
         <div className="gameplay-hud fixed inset-0 z-30 flex flex-col justify-between p-2 sm:p-3 safe-pad pointer-events-none">
+          {gameMode === 'obstacle_rush' && <GunFightKillNotice key={rushRunKey} kills={rushHud.playerKills ?? 0} />}
           {/* TOP BAR: Compact Neutral Frosted Glassmorphic HUD */}
           <div className="gameplay-topbar relative z-10">
             {/* Top-Left: Compact Glassmorphic Audio + Voice Mic Controls */}

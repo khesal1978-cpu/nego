@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+class StaticSceneryMesh extends THREE.Mesh {
+  override updateWorldMatrix(updateParents: boolean, updateChildren: boolean) {
+    // Bounds queries visit children without forwarding the parent's dirty flag.
+    // Refresh world space there while retaining the baked local transform.
+    super.updateWorldMatrix(updateParents, updateChildren, true);
+  }
+}
+
 /** Batch only static opaque scenery; animated objects and pickups keep their
  * own transforms. Matching materials/shadow flags share one draw call. */
 export function batchStaticScenery(root: THREE.Group, animated: THREE.Object3D[] = []) {
@@ -27,9 +35,12 @@ export function batchStaticScenery(root: THREE.Group, animated: THREE.Object3D[]
     geometries.forEach(part => part.dispose());
     if (!geometry) continue;
     const first = batch.meshes[0];
-    const merged = new THREE.Mesh(geometry, batch.material); merged.name = 'Batched static scenery';
+    const merged = new StaticSceneryMesh(geometry, batch.material); merged.name = 'Batched static scenery';
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
     merged.castShadow = first.castShadow; merged.receiveShadow = first.receiveShadow; merged.renderOrder = first.renderOrder;
+    // The baked mesh stays fixed within its parent, including animated rigs.
+    // Parent world matrices still update; its local matrix needs no per-frame rebuild.
+    merged.updateMatrix(); merged.matrixAutoUpdate = false;
     for (const mesh of batch.meshes) {
       // Preserve unbatched children such as transparent details and outlines.
       for (const child of [...mesh.children]) root.attach(child);

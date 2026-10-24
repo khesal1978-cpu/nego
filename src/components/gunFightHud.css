@@ -2,4 +2,8 @@
 .gun-score i { height: 12px; width: 1px; margin: 0 2px; background: #ffffff36; }
 .gun-score svg { opacity: .75; }
 .gun-score-urgent { color: #f0b6a8; }
+.gun-kill-notice { position: fixed; left: 50%; top: calc(50% + 44px); display: flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid #f1646540; border-radius: 7px; background: #201619a8; color: #f16465; font: 900 13px var(--font-display); letter-spacing: .09em; line-height: 1; pointer-events: none; animation: gunKillConfirm .6s ease-out forwards; }
+@keyframes gunKillConfirm { 0% { opacity: 0; transform: translate(-50%, 3px) scale(.92); } 16%, 62% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -5px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .gun-kill-notice { transform: translateX(-50%); animation-name: gunKillFade; } }
+@keyframes gunKillFade { 0%, 65% { opacity: 1; } 100% { opacity: 0; } }
 @media (max-width: 380px) { .gun-score { gap: 5px; padding-inline: 8px; font-size: 12px; } }

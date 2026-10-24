@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
-import { dealCustomCharacters } from '../src/network/customCharacters';
-import { customPlayerCount, isVolleyballMode, type CustomMode } from '../src/network/customModes';
+import { dealCustomCharacters } from '../src/network/customCharacters.js';
+import { customPlayerCount, isVolleyballMode, type CustomMode } from '../src/network/customModes.js';
 
 export interface CustomSlotState {
   slotIndex: number;

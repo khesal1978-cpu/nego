@@ -16,6 +16,7 @@ export function createLoadingCast(ids: readonly string[], anisotropy = 1) {
     rig.root.position.set((index - (ids.length - 1) / 2) * 1.55, 0, 0);
     rig.root.rotation.y = (index - (ids.length - 1) / 2) * -.16;
     rig.shadowMesh.visible = false;
+    rig.root.updateWorldMatrix(true, true);
     return rig;
   });
 }

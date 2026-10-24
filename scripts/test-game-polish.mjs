@@ -12,7 +12,7 @@ const m = await import('../.npm-cache/game-polish-tests.mjs');
 for (const angle of [-2, -.4, 0, .4, 2]) {
   const aim = m.assistedNukeDirection(0, -1, Math.sin(Math.PI + angle), Math.cos(Math.PI + angle));
   assert(Math.abs(Math.hypot(aim.x, aim.z) - 1) < 1e-8);
-  assert(Math.abs(Math.atan2(aim.x, -aim.z)) <= .065001, 'Aim assistance cannot snap to a distant target');
+  assert(Math.abs(Math.atan2(aim.x, -aim.z)) <= .090001, 'Aim assistance cannot snap to a distant target');
 }
 for (const fps of [30, 60, 120]) {
   let speed = 0;
@@ -62,6 +62,21 @@ assert(before.min.distanceTo(after.min) < 1e-5 && before.max.distanceTo(after.ma
 assert(animated.getWorldPosition(new THREE.Vector3()).distanceTo(animatedBefore) < 1e-6);
 assert.equal(root.children.filter(child => child.isMesh).length, 2, 'Six static meshes should become one draw');
 assert(root.children.find(child => child.name === 'Batched static scenery').castShadow);
+const baked = root.children.find(child => child.name === 'Batched static scenery');
+const bakedBefore = new THREE.Box3().setFromObject(baked);
+let localRebuilds = 0;
+const rebuild = baked.updateMatrix.bind(baked);
+baked.updateMatrix = () => { localRebuilds++; rebuild(); };
+root.position.x += 4;
+new THREE.Box3().setFromObject(root);
+const queriedBounds = new THREE.Box3().setFromObject(baked);
+assert(Math.abs(queriedBounds.min.x - bakedBefore.min.x - 4) < 1e-5 && Math.abs(queriedBounds.max.x - bakedBefore.max.x - 4) < 1e-5,
+  'Bounds follow changed parents before a render updates the scene');
+animated.rotation.y += .3;
+for (let i = 0; i < 120; i++) root.updateMatrixWorld(true);
+assert.equal(localRebuilds, 0, 'Baked local transforms do no repeated frame work');
+const movedBounds = new THREE.Box3().setFromObject(baked);
+assert(movedBounds.min.x > before.min.x && animated.matrixAutoUpdate, 'Moving parents and animated parts still update normally');
 
 // Canvas drawing is mocked here to exercise real model geometry without a GPU.
 // This does not validate how the textures or shaders look on screen.

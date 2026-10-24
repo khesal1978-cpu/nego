@@ -1650,6 +1650,8 @@ export function createCrayonCharacter(
   const modelScale = CHARACTER_MODEL_HEIGHT / Math.max(.01, modelBounds.max.y - modelBounds.min.y);
   modelRoot.scale.setScalar(modelScale);
   modelRoot.position.y = -modelBounds.min.y * modelScale;
+  // Refresh baked descendants after sizing so preview bounds are valid immediately.
+  root.updateWorldMatrix(true, true);
 
   return {
     root,

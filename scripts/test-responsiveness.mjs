@@ -77,9 +77,25 @@ for (const refresh of [60, 90, 120]) {
 for (const fps of [30, 60, 120]) {
   const correction = m.nukeAimAssistStep(.06, -.03, 1.8, 55, 1 / fps);
   assert(correction.yaw < 0 && correction.pitch > 0);
-  assert(Math.abs(correction.yaw) <= .35 / fps && Math.abs(correction.pitch) <= .35 / fps);
+  assert(Math.abs(correction.yaw) <= .45 / fps && Math.abs(correction.pitch) <= .45 / fps);
 }
 assert.equal(m.nukeAimAssistStep(.5, 0, 1.8, 55, 1 / 60).yaw, 0, 'Targets outside the small cone cannot pull the camera');
+
+// A slightly off-centre throw now reaches the body, at both slow and fast refresh rates.
+const forgivingAim = m.assistedNukeDirection(Math.sin(.11), -Math.cos(.11), 0, -1);
+for (const fps of [20, 30, 60, 120]) {
+  const origin = { x: 0, y: 1.12, z: 0 };
+  const target = { x: forgivingAim.x * 18, y: 1.12, z: forgivingAim.z * 18 };
+  const ball = { ...origin, ...Object.fromEntries(Object.entries(m.nukeThrowVelocity(origin, target, 32)).map(([axis, value]) => ['v' + axis, value])) };
+  const duration = 18 / 32;
+  for (let elapsed = 0; elapsed < duration;) {
+    const dt = Math.min(1 / fps, duration - elapsed); m.advanceNukeThrow(ball, dt); elapsed += dt;
+  }
+  assert(Math.hypot(ball.x, ball.z + 18) < m.NUKE_HIT_RADIUS, 'Near-reticle throws connect without a perfect centre aim');
+  assert(Math.abs(ball.y - 1.12) < 1e-8);
+}
+assert(m.nukeAimAssistStep(.12, 0, 1.8, 55, 1 / 60).yaw < 0, 'Near-edge targets receive gentle assistance');
+assert.equal(m.nukeAimAssistStep(.3, 0, 1.8, 55, 1 / 60).yaw, 0, 'Off-reticle targets remain outside assistance');
 
 // Aim along the actual reticle ray at several target depths, then integrate the
 // game projectile through its full flight at different display refresh rates.

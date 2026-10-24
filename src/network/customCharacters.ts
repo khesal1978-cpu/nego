@@ -1,4 +1,4 @@
-import { CRAYON_CHARACTERS, type CharacterConfig } from '../types/game';
+import { CRAYON_CHARACTERS, type CharacterConfig } from '../types/game.js';
 
 type Slot = { occupiedBy: string; charId: string; outfitId: string; faceId: string; playerName: string };
 

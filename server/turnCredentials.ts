@@ -1,4 +1,4 @@
-import { DEFAULT_ICE_SERVERS, normalizeIceServers } from '../src/network/iceServers';
+import { DEFAULT_ICE_SERVERS, normalizeIceServers } from '../src/network/iceServers.js';
 
 export function createTurnCredentials(env: Record<string, string | undefined>, request: typeof fetch = (...args) => fetch(...args), now = Date.now) {
   const key = env.CLOUDFLARE_TURN_KEY_ID, token = env.CLOUDFLARE_TURN_API_TOKEN;

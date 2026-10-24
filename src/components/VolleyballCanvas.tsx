@@ -1024,6 +1024,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       };
     };
 
+    let lastHighlightTime = -Infinity;
     const executePlayerHit = (
       isSpikeIntent: boolean,
       wantSuper: boolean,
@@ -1043,7 +1044,6 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       gameData.setCooldownTimer = 0.22;
 
       const isAirSpike = isSpikeIntent || gameData.py > 0.16 || isFromSet;
-      const isDiveSave = gameData.pDiveTimer > 0;
 
       // Skill-Based Shot Quality & Placement:
       // Evaluates player's jump apex timing, sweet-spot distance to ball, and active directional aiming!
@@ -1149,6 +1149,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       );
 
       if (canSuper) {
+        lastHighlightTime = performance.now();
         propsRef.current.onCallout({
           text: `${pCfg.superMoveName.toUpperCase()}!`,
           subtext: 'UNSTOPPABLE SUPER SHOT!',
@@ -1157,16 +1158,8 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           x: 50,
           y: 34,
         });
-      } else if (isFromSet && isAirSpike) {
-        propsRef.current.onCallout({
-          text: 'VOLLEY SMASH!',
-          subtext: 'Alley-Oop Power Spike!',
-          color: '#F8FAFC',
-          bgHex: '#D97706',
-          x: 50,
-          y: 35,
-        });
-      } else if (isPerfectTiming) {
+      } else if (isPerfectTiming && performance.now() - lastHighlightTime >= 4000) {
+        lastHighlightTime = performance.now();
         propsRef.current.onCallout({
           text: 'PERFECT SMASH!',
           subtext: 'Apex Timing · Corner Laser!',
@@ -1174,23 +1167,6 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           bgHex: '#16A34A',
           x: 50,
           y: 35,
-        });
-      } else if (isAirSpike) {
-        propsRef.current.onCallout({
-          text: 'SUPER SPIKE!',
-          subtext: 'Sweet Spot Smash!',
-          color: '#F8FAFC',
-          bgHex: '#2563EB',
-          x: 50,
-          y: 36,
-        });
-      } else if (isDiveSave) {
-        propsRef.current.onCallout({
-          text: 'DIVING SAVE!',
-          color: '#F8FAFC',
-          bgHex: '#059669',
-          x: 50,
-          y: 62,
         });
       }
     };
@@ -1231,19 +1207,10 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         false,
         false
       );
-      propsRef.current.onCallout({
-        text: 'VOLLEY LIFT!',
-        subtext: 'Ball Lifted — Jump & Spike!',
-        color: '#F8FAFC',
-        bgHex: '#0284C7',
-        x: 50,
-        y: 48,
-      });
     };
 
     // Execute Teammate Set / Lift ("teammate uthana") in 2v2 ONLY when needed & rare!
     const executePartnerSetLift = () => {
-      const ptCfg = propsRef.current.partnerChar;
       gameData.rallyCount += 1;
       gameData.ptSwingTimer = 0.38;
       gameData.ptvy = 4.4;
@@ -1274,14 +1241,6 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         false,
         true
       );
-      propsRef.current.onCallout({
-        text: `${ptCfg.name.toUpperCase()} ASSIST LIFT!`,
-        subtext: 'Rare Teammate Set — Jump & Smash!',
-        color: '#F8FAFC',
-        bgHex: '#7C3AED',
-        x: 50,
-        y: 52,
-      });
     };
 
     // Triggered by Swipe Down on mobile/touch, Downward Scroll (Wheel), or PC Alt Key!
@@ -1314,14 +1273,6 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         spawnParticleBurst(gameData.bx, gameData.by, gameData.bz, 16, [
           0xfacc15, 0x38bdf8,
         ]);
-        propsRef.current.onCallout({
-          text: 'SELF TOSS LIFT!',
-          subtext: 'Run Up & Jump Smash!',
-          color: '#F8FAFC',
-          bgHex: '#0284C7',
-          x: 50,
-          y: 48,
-        });
         return;
       }
 

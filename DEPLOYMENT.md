@@ -52,6 +52,8 @@ Local checks: `npm run lint`, `npm run test:vercel`, `npm run test:deployment`, 
 
 The game is at `/`, its standalone policy is at `/privacy.html`, and Settings > About contains the policy and ArsDev YouTube credit. Browser saves remain tied to the browser and website origin.
 
+The Vercel suite also runs `scripts/test-vercel-runtime.mjs`, which emits the API and its source dependencies as separate ESM files and imports the real entry under Node. It checks startup and HTTP setup responses without Atlas credentials. Keep explicit `.js` extensions on relative imports in the API's dependency graph: TypeScript resolves the source files, while Node resolves the emitted JavaScript files.
+
 ## Expiration and operational limits
 
 Abandoned clients expire after 90 seconds and are removed during the next state update. The room document expires after two hours without a write. Relay packets expire after 30 seconds; the Atlas TTL index cleans up expired documents asynchronously, and the adapter immediately ignores expired records/packets even before physical deletion. TTL is temporary cleanup, not a game replay/archive feature.

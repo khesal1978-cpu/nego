@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import WebSocket from 'ws';
+import './test-vercel-runtime.mjs';
 
 await build({ stdin: { contents: `export * from './server/mongoRooms'; export * from './server/vercelMultiplayer'; export * from './server/roomRoutes';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', packages: 'external', outfile: '.npm-cache/vercel-test.mjs' });
 const { createMongoRoomStore, mongoEnvironment, createVercelMultiplayer, executeRoomRequest } = await import('../.npm-cache/vercel-test.mjs');

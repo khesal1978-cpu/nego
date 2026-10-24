@@ -1,4 +1,4 @@
-import { createRoomEngine, DEFAULT_BOT_CHARS, type CustomRoomState } from './roomEngine';
+import { createRoomEngine, DEFAULT_BOT_CHARS, type CustomRoomState } from './roomEngine.js';
 export function registerRoomRoutes(app: { get(path: string, handler: (req: any, res: any) => void): unknown; post(path: string, handler: (req: any, res: any) => void): unknown }, engine: ReturnType<typeof createRoomEngine>) {
   const { normalizeRoomCode, rooms, clients, findMatchingRoom, getPublicRoomSummaries, getOrUpdateClient, handleCreateRoomForClient, handleJoinRoomForClient, removePlayerFromCurrentRoom, roomActionError, broadcastRoomState, applyRoomSettings, broadcastPublicRoomList, startRoomMatch, returnRoomToLobby, applyPlayerUpdate } = engine;
   app.get('/api/mp/state', (req, res) => {

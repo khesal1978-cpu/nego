@@ -7,7 +7,7 @@ import { batchStaticScenery, disposeSceneGeometry } from '../three/scenePerforma
 import { approachingThreat, reactionChance } from './enemyBehavior';
 import { createBloodFeedback } from '../three/combatFeedback';
 import { createCharacterRagdolls } from '../three/characterRagdoll';
-import { assistedNukeDirection, movementBlend, nukeAimPoint, nukeThrowVelocity, advanceNukeThrow, nukeLookDelta, nukeRoundSurvivors, nukeAimAssistStep, nukeHitAllowed, NUKE_HIT_RADIUS } from './nukeControls';
+import { assistedNukeDirection, movementBlend, nukeAimPoint, nukeThrowVelocity, advanceNukeThrow, nukeLookDelta, nukeRoundSurvivors, nukeAimAssistStep, nukeHitAllowed, NUKE_HIT_RADIUS, NUKE_AIM_ACQUIRE, NUKE_AIM_RELEASE } from './nukeControls';
 import { createOverheadHealthBar, hitHealthVisible, updateOverheadHealth } from '../three/overheadHealth';
 import { NUKE_FLOOR_RADIUS, clampToNukeArena, bounceAtNukeBoundary, nukeSpawnPosition } from './nukeArena';
 import { createRoundNukeFloorGeometry, createRoundNukeFloorTexture } from '../three/roundArenaGeometry';
@@ -1335,7 +1335,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
     let assistedTargetId: string | null = null;
     const getCrosshairLockedEnemy = (): DodgeballAthlete | null => {
       let target: DodgeballAthlete | null = null;
-      let best = .14;
+      let best = NUKE_AIM_ACQUIRE;
       for (const other of athletes) {
         if (other.id === playerAthlete.id || other.eliminated) continue;
         const distance = Math.hypot(other.x - playerAthlete.x, other.z - playerAthlete.z);
@@ -1343,7 +1343,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         aimProjection.set(other.x, other.y + 1.2, other.z).project(camera);
         if (aimProjection.z < -1 || aimProjection.z > 1) continue;
         const screenDistance = Math.hypot(aimProjection.x * camera.aspect, aimProjection.y);
-        const score = other.id === assistedTargetId && screenDistance < .2 ? screenDistance * .65 : screenDistance;
+        const score = other.id === assistedTargetId && screenDistance < NUKE_AIM_RELEASE ? screenDistance * .65 : screenDistance;
         if (score < best) { best = score; target = other; }
       }
       assistedTargetId = target?.id ?? null;
@@ -1396,8 +1396,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
             lockedEnemy.z - thrower.z
           );
           const flightTime = rawDist / Math.max(18, throwSpeed);
-          const leadX = lockedEnemy.x + lockedEnemy.vx * flightTime * 0.42;
-          const leadZ = lockedEnemy.z + lockedEnemy.vz * flightTime * 0.42;
+          const leadX = lockedEnemy.x + lockedEnemy.vx * flightTime * 0.7;
+          const leadZ = lockedEnemy.z + lockedEnemy.vz * flightTime * 0.7;
           const toEnemyX = leadX - thrower.x;
           const toEnemyZ = leadZ - thrower.z;
           const toLen = Math.max(0.01, Math.hypot(toEnemyX, toEnemyZ));

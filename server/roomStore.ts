@@ -1,4 +1,4 @@
-import type { createRoomEngine, RoomNotice, RoomSnapshot } from './roomEngine';
+import type { createRoomEngine, RoomNotice, RoomSnapshot } from './roomEngine.js';
 
 export type RoomRecord = { epoch: string; revision: number; snapshot: RoomSnapshot };
 export type RoomCommit = { kind: 'commit'; epoch: string; revision: number; notices: RoomNotice[] };

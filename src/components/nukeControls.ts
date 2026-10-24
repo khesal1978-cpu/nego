@@ -3,7 +3,7 @@ export function assistedNukeDirection(x: number, z: number, targetX: number, tar
   const angle = Math.atan2(x, z);
   const targetAngle = Math.atan2(targetX, targetZ);
   const difference = Math.atan2(Math.sin(targetAngle - angle), Math.cos(targetAngle - angle));
-  const correction = Math.max(-.065, Math.min(.065, difference * .35));
+  const correction = Math.max(-.09, Math.min(.09, difference * .5));
   return { x: Math.sin(angle + correction), z: Math.cos(angle + correction) };
 }
 
@@ -48,7 +48,9 @@ export function nukeRoundSurvivors(players: number, round: number) {
 }
 
 export const nukeHitAllowed = (dodgeTimer: number, invulnerableTimer: number) => dodgeTimer <= 0 && invulnerableTimer <= 0;
-export const NUKE_HIT_RADIUS = .94;
+export const NUKE_HIT_RADIUS = 1.06;
+export const NUKE_AIM_ACQUIRE = .22;
+export const NUKE_AIM_RELEASE = .28;
 
 export function nukeDodgeDirection(x: number, z: number, facingYaw: number) {
   const length = Math.hypot(x, z);
@@ -65,10 +67,10 @@ export function beginNukeDodge(athlete: { dodgeCooldown: number; dodgeActiveTime
 
 /** Gentle reticle attraction within a small cone; never snaps across the arena. */
 export function nukeAimAssistStep(x: number, y: number, aspect: number, fov: number, dt: number) {
-  if (Math.hypot(x * aspect, y) > .2) return { yaw: 0, pitch: 0 };
+  if (Math.hypot(x * aspect, y) > NUKE_AIM_RELEASE) return { yaw: 0, pitch: 0 };
   const tangent = Math.tan(fov * Math.PI / 360);
-  const blend = 1 - Math.exp(-3 * Math.max(0, dt));
-  const limit = .35 * Math.max(0, dt);
+  const blend = 1 - Math.exp(-4 * Math.max(0, dt));
+  const limit = .45 * Math.max(0, dt);
   const bounded = (angle: number) => Math.max(-limit, Math.min(limit, angle * blend));
   return { yaw: bounded(-Math.atan(x * aspect * tangent)), pitch: bounded(-Math.atan(y * tangent)) };
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { MongoClient, type Collection, type Db } from 'mongodb';
-import { createRoomEngine, type RoomNotice } from './roomEngine';
-import type { RoomCommit, RoomRecord, RoomStore } from './roomStore';
+import { createRoomEngine, type RoomNotice } from './roomEngine.js';
+import type { RoomCommit, RoomRecord, RoomStore } from './roomStore.js';
 
 export function mongoEnvironment(env: Record<string, string | undefined>) {
   const uri = env.MONGODB_URI?.trim();

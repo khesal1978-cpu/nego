@@ -1,13 +1,13 @@
 import http from 'node:http';
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
-import { createRoomEngine, type CustomRoomState, type RoomNotice } from './roomEngine';
-import { executeRoomRequest } from './roomRoutes';
-import { createMongoRoomStore, mongoEnvironment } from './mongoRooms';
-import type { RoomCommit, RoomStore } from './roomStore';
-import { createOriginPolicy } from './originPolicy';
-import { createTurnCredentials } from './turnCredentials';
-import { MAX_REALTIME_BUFFER } from '../src/network/transport';
+import { createRoomEngine, type CustomRoomState, type RoomNotice } from './roomEngine.js';
+import { executeRoomRequest } from './roomRoutes.js';
+import { createMongoRoomStore, mongoEnvironment } from './mongoRooms.js';
+import type { RoomCommit, RoomStore } from './roomStore.js';
+import { createOriginPolicy } from './originPolicy.js';
+import { createTurnCredentials } from './turnCredentials.js';
+import { MAX_REALTIME_BUFFER } from '../src/network/transport.js';
 
 export function createVercelMultiplayer(env = process.env, providedStore?: RoomStore) {
   const app = express(), server = http.createServer(app);
