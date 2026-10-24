@@ -1,4 +1,4 @@
-// Original SIXGUN menu theme: warm keys, a slow bass groove and soft percussion.
+// Original Bonk Up menu theme: warm keys, a slow bass groove and soft percussion.
 export const MUSIC_SAMPLE_RATE = 32000;
 export const MUSIC_BEAT = 60 / 82;
 export const MUSIC_BARS = 8;

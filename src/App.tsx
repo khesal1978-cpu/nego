@@ -545,7 +545,7 @@ export function App() {
   const handleLoadingReady = useCallback(() => setLoadingSceneReady(true), []);
   const loadingNeedsRotation = viewport.h > viewport.w && typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
-  // Smooth initial game loading animation (0% -> 100%) when opening SIXGUN, then auto-open game
+  // Smooth initial game loading animation (0% -> 100%) when opening Bonk Up, then auto-open game
   useEffect(() => {
     if (!loadingSceneReady || loadingNeedsRotation) return;
     let rafId = 0;
@@ -602,7 +602,7 @@ export function App() {
   const needsLandscape = isPortrait && (isTouchDevice || gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'TOUR_MAP');
   const canvasGameState = gameState === 'GAME_OVER' || (gameState === 'PLAYING' && (isPortrait || showControls))
     ? 'PAUSED' : gameState;
-  // Show SIXGUN Splash & Loading screen on initial open
+  // Show Bonk Up Splash & Loading screen on initial open
   const showSplashScreen = !splashDismissed;
 
   // True when viewport is in landscape aspect ratio so side-by-side panels work across all mobile & desktop landscape screens
@@ -1742,7 +1742,7 @@ export function App() {
                 <svg
                   viewBox="0 0 460 220"
                   role="img"
-                  aria-label="SIXGUN"
+                  aria-label="Bonk Up"
                   className="w-full h-auto overflow-visible drop-shadow-[0_12px_20px_rgba(4,16,30,0.48)]"
                 >
                   <defs>
@@ -1847,7 +1847,7 @@ export function App() {
                         strokeLinecap="round"
                         fill="#04101E"
                       >
-                        SIXGUN
+                        Bonk Up
                       </text>
                     ))}
 
@@ -1869,7 +1869,7 @@ export function App() {
                       strokeLinecap="round"
                       fill="url(#sixgun_bevel_grad)"
                     >
-                      SIXGUN
+                      Bonk Up
                     </text>
 
                     <text
@@ -1890,7 +1890,7 @@ export function App() {
                       strokeLinecap="round"
                       fill="url(#sixgun_top_face)"
                     >
-                      SIXGUN
+                      Bonk Up
                     </text>
 
                     <text
@@ -1908,7 +1908,7 @@ export function App() {
                       clipPath="url(#sixgun_top_shine)"
                       style={{ pointerEvents: 'none' }}
                     >
-                      SIXGUN
+                      Bonk Up
                     </text>
 
                     <g transform="translate(418, 86) rotate(12)">

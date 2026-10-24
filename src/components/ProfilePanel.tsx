@@ -22,7 +22,7 @@ export function ProfilePanel(p: Props) {
   const saveName = () => { const name = draft.trim().slice(0, 16) || p.name; setDraft(name); p.onName(name); setSaved(true); };
   const leave = () => { saveName(); p.onBack(); };
   return <section className={`profile-panel ${p.height <= 500 ? 'profile-panel--compact' : ''} ${p.height <= 280 ? 'profile-panel--keyboard' : ''}`} aria-label="Player profile">
-    <header className="profile-header"><button className="profile-back" onClick={leave} aria-label="Back to main menu"><ArrowLeft size={20} /></button><div><span>SIXGUN</span><h1>PLAYER PROFILE</h1></div><span className="profile-header-badge"><UserRound size={14} />YOU</span></header>
+    <header className="profile-header"><button className="profile-back" onClick={leave} aria-label="Back to main menu"><ArrowLeft size={20} /></button><div><span>Bonk Up</span><h1>PLAYER PROFILE</h1></div><span className="profile-header-badge"><UserRound size={14} />YOU</span></header>
     <div className="profile-layout">
       <section className="profile-showcase" aria-label="Your character"><div className="profile-hero-halo" aria-hidden="true" /><CharacterPreview3D character={p.character} /><div className="profile-hero-caption"><span className="profile-character-badge">{p.characterName}</span><h2>{p.name}</h2><p>DRAG TO ROTATE</p></div></section>
       <section className="profile-details" aria-label="Profile details"><div className="profile-card-header"><span className="profile-card-icon"><UserRound size={23} /></span><div><span className="profile-eyebrow">YOUR CALLSIGN</span><h2>MAKE IT YOURS</h2></div></div>

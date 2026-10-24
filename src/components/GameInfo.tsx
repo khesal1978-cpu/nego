@@ -5,7 +5,7 @@ import './gameInfo.css';
 export function GameInfo() {
   return <div className="game-info">
     <section className="game-credit" aria-labelledby="credits-title">
-      <div><span>SIXGUN</span><h2 id="credits-title">Created by ArsDev</h2><p>Game design & development</p></div>
+      <div><span>Bonk Up</span><h2 id="credits-title">Created by ArsDev</h2><p>Game design & development</p></div>
       <a href={CREATOR_URL} target="_blank" rel="noopener noreferrer"><Youtube size={20} />ArsDevS1<ExternalLink size={14} /><span className="sr-only"> on YouTube (opens a new tab)</span></a>
     </section>
     <section className="game-privacy" aria-labelledby="privacy-title">

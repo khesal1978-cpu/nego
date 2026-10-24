@@ -13,7 +13,7 @@ async function main() {
   const response = await fetch(`${origin}/api/health`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
   const health = response?.ok ? await response.json().catch(() => null) : null;
   if (health?.status !== 'ok' || typeof health.instanceId !== 'string' || typeof health.activeRooms !== 'number') {
-    throw new Error(`Start the SIXGUN game server on ${origin} first, then reopen this launcher.`);
+    throw new Error(`Start the Bonk Up game server on ${origin} first, then reopen this launcher.`);
   }
   // A production preview shares the same room backend without exposing Vite source files.
   const page = await fetch(origin, { signal: AbortSignal.timeout(5000) });

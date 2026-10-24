@@ -155,8 +155,8 @@ export function FullscreenControl({ autoHide = false }: { autoHide?: boolean }) 
     {message && <p className="fullscreen-message" role="status" onClick={() => setMessage('')}>{message}</p>}
     {installGuide && <div className="fullscreen-install" role="dialog" aria-label="Full screen on iPhone and iPad">
       <header><strong>Play without browser bars</strong><button type="button" aria-label="Close instructions" onClick={() => setInstallGuide(false)}><X size={18} /></button></header>
-      <p>This Safari tab cannot enter full screen. Open SIXGUN from your Home Screen instead.</p>
-      <ol><li>Tap Safari’s <Share size={14} /> <b>Share</b> button.</li><li>Choose <b>Add to Home Screen</b>. Keep <b>Open as Web App</b> on if shown.</li><li>Tap <b>Add</b>, open SIXGUN from its new icon and rotate your phone sideways.</li></ol>
+      <p>This Safari tab cannot enter full screen. Open Bonk Up from your Home Screen instead.</p>
+      <ol><li>Tap Safari’s <Share size={14} /> <b>Share</b> button.</li><li>Choose <b>Add to Home Screen</b>. Keep <b>Open as Web App</b> on if shown.</li><li>Tap <b>Add</b>, open Bonk Up from its new icon and rotate your phone sideways.</li></ol>
       <small>Keep the game server and this link running.</small>
     </div>}
   </div>;

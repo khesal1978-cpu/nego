@@ -47,9 +47,9 @@ export function LoadingScreen({ progress, onReady, initialScene }: { progress: n
   }, []);
   const scene = LOADING_SCENES[index];
   const safeProgress = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
-  return <section className={`loading-screen loading-screen--${scene.id}${safeProgress >= 100 ? ' loading-screen--complete' : ''}`} aria-label="SIXGUN loading screen">
+  return <section className={`loading-screen loading-screen--${scene.id}${safeProgress >= 100 ? ' loading-screen--complete' : ''}`} aria-label="Bonk Up loading screen">
     <div className="loader-grain" aria-hidden="true" />
-    <header className="loader-header"><span className="loader-wordmark">SIX<span>ZUN</span><i /></span><span className="loader-edition">LITTLE LEGENDS. BIG GAMES.</span><span className="loader-scene-count">{String(index + 1).padStart(2, '0')}<span> / {String(LOADING_SCENES.length).padStart(2, '0')}</span></span></header>
+    <header className="loader-header"><span className="loader-wordmark">Bonk <span>Up</span><i /></span><span className="loader-edition">LITTLE LEGENDS. BIG GAMES.</span><span className="loader-scene-count">{String(index + 1).padStart(2, '0')}<span> / {String(LOADING_SCENES.length).padStart(2, '0')}</span></span></header>
     <main className="loader-main">
       <div className="loader-copy" key={scene.id}>
         <p className="loader-kicker"><span />{scene.kicker}</p>
@@ -62,7 +62,7 @@ export function LoadingScreen({ progress, onReady, initialScene }: { progress: n
       <LoadingScene index={index} onReady={onReady} />
     </main>
     <footer className="loader-footer">
-      <div className="loader-progress-area"><div className="loader-progress-label"><span>{safeProgress >= 100 ? 'READY TO PLAY' : 'GETTING READY'}<i className="loader-dots">...</i></span><span>SIXGUN</span></div><div className="loader-progress" role="progressbar" aria-label="Startup progress" aria-valuenow={Math.round(safeProgress)} aria-valuemin={0} aria-valuemax={100}><div style={{ transform: `scaleX(${safeProgress / 100})` }} /></div><p className="loader-tip">{scene.tip}</p></div>
+      <div className="loader-progress-area"><div className="loader-progress-label"><span>{safeProgress >= 100 ? 'READY TO PLAY' : 'GETTING READY'}<i className="loader-dots">...</i></span><span>Bonk Up</span></div><div className="loader-progress" role="progressbar" aria-label="Startup progress" aria-valuenow={Math.round(safeProgress)} aria-valuemin={0} aria-valuemax={100}><div style={{ transform: `scaleX(${safeProgress / 100})` }} /></div><p className="loader-tip">{scene.tip}</p></div>
       <span className="loader-auto" role="status">{safeProgress >= 100 ? 'LET’S GO' : 'OPENING AUTOMATICALLY'}<i aria-hidden="true" /></span>
     </footer>
   </section>;

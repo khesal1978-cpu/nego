@@ -711,7 +711,7 @@ async function startServer() {
   });
 
   if (process.env.SERVE_FRONTEND === 'false') {
-    app.get('/', (_req, res) => res.json({ service: 'SIXZUN multiplayer', status: 'ok' }));
+    app.get('/', (_req, res) => res.json({ service: 'Bonk Up multiplayer', status: 'ok' }));
     app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   } else if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
