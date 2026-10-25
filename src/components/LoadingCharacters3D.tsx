@@ -6,6 +6,7 @@ import { animateMenuEmote } from '../three/menuEmotes';
 import { disposeSceneGeometry } from '../three/scenePerformance';
 import { effectivePixelRatio } from '../three/visualSettings';
 import { createArenaWeapon } from '../three/arenaProps';
+import { bindWebGLRecovery } from '../three/webglRecovery';
 
 export type LoadingPresentation = 'cast' | 'gun';
 
@@ -107,11 +108,16 @@ export function LoadingCharacters3D({ characters, onReady, presentation = 'cast'
       resize();
     };
     const observer = new ResizeObserver(resize); observer.observe(host);
+    const recovery = bindWebGLRecovery(renderer, scene, {
+      resume: () => { resize(); renderer.render(scene, camera); },
+      lost: () => { setUnavailable(true); readyRef.current(); },
+      restored: () => setUnavailable(false),
+    });
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0, last = 0, started = 0, ready = false;
     const draw = (now: number) => {
       frame = requestAnimationFrame(draw);
-      if (document.hidden || now - last < 1000 / 30 || !cast.length) return;
+      if (document.hidden || !recovery.ready() || now - last < 1000 / 30 || !cast.length) return;
       if (!started) started = now;
       const dt = Math.min(.1, (now - last) / 1000); last = now;
       const elapsed = (now - started) / 1000;
@@ -129,12 +135,9 @@ export function LoadingCharacters3D({ characters, onReady, presentation = 'cast'
       renderer.render(scene, camera);
       if (!ready) { ready = true; readyRef.current(); }
     };
-    const contextLost = (event: Event) => { event.preventDefault(); setUnavailable(true); readyRef.current(); };
-    renderer.domElement.addEventListener('webglcontextlost', contextLost);
     frame = requestAnimationFrame(draw);
     return () => {
-      cancelAnimationFrame(frame); observer.disconnect(); updateCast.current = null;
-      renderer.domElement.removeEventListener('webglcontextlost', contextLost);
+      cancelAnimationFrame(frame); observer.disconnect(); updateCast.current = null; recovery.dispose();
       disposeSceneGeometry(scene); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
   }, []);

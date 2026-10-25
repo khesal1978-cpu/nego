@@ -3,6 +3,11 @@ import type { TouchAction } from './touchControlLayout';
 // Compact silhouettes stay readable over the court at phone HUD sizes.
 export function TouchControlIcon({ action }: { action: Exclude<TouchAction, 'move'> }) {
   return <svg viewBox="0 0 40 40" fill="currentColor" aria-hidden="true" focusable="false">
+    {action === 'reload' && <>
+      <path d="M31 12a13 13 0 0 0-22-1m-1 1H3V5m6 23a13 13 0 0 0 22 1m1-1h5v7" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 16h10v13H15Zm0-2v-2c0-2 2-5 5-6 3 1 5 4 5 6v2Z" />
+      <path d="M18 20v5m4-5v5" fill="none" stroke="var(--icon-cutout)" strokeWidth="1.6" strokeLinecap="round" />
+    </>}
     {action === 'fire' && <>
       <path d="m12 25 12-12 7 7-12 12c-1.1 1.1-2.9 1.1-4 0l-3-3c-1.1-1.1-1.1-2.9 0-4Zm14-14 1.8-1.8c2.1-2.1 6.3-3.2 8.2-2.2 1 1.9-.1 6.1-2.2 8.2L32 17Z" />
       <path d="m8 32-3 3m4-15-5 1m15 12-1 5M21 8l-1-4m14 18 4 1" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />

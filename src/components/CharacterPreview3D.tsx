@@ -6,9 +6,12 @@ import { disposeSceneGeometry } from '../three/scenePerformance';
 import { effectivePixelRatio } from '../three/visualSettings';
 import { animateMainMenuIdle } from '../three/menuEmotes';
 import { characterPreviewBounds, characterPreviewDistance } from '../three/characterPreviewFraming';
+import { bindWebGLRecovery } from '../three/webglRecovery';
+import { characterSceneKey } from '../three/characterSceneKey';
 
 export function CharacterPreview3D({ character, animated = false }: { character: CharacterConfig; animated?: boolean }) {
   const container = useRef<HTMLDivElement>(null);
+  const sceneKey = characterSceneKey(character);
   useEffect(() => {
     const host = container.current!;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -40,6 +43,7 @@ export function CharacterPreview3D({ character, animated = false }: { character:
       camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize); observer.observe(host); resize();
+    const recovery = bindWebGLRecovery(renderer, scene, { resume: () => { resize(); renderer.render(scene, camera); } });
     let yaw = 0, pointer: number | null = null, lastX = 0, frame = 0, lastFrame = 0;
     const down = (event: PointerEvent) => { if (animated) return; pointer = event.pointerId; lastX = event.clientX; host.setPointerCapture(event.pointerId); };
     const move = (event: PointerEvent) => { if (event.pointerId === pointer) { yaw += (event.clientX - lastX) * .012; lastX = event.clientX; } };
@@ -49,7 +53,7 @@ export function CharacterPreview3D({ character, animated = false }: { character:
     let started: number | null = null;
     const render = (time: number) => {
       frame = requestAnimationFrame(render);
-      if (document.hidden || time - lastFrame < 1000 / 30) return;
+      if (document.hidden || !recovery.ready() || time - lastFrame < 1000 / 30) return;
       const dt = Math.min(.1, (time - lastFrame) / 1000); lastFrame = time;
       started ??= time;
       const elapsed = (time - started) / 1000;
@@ -62,10 +66,10 @@ export function CharacterPreview3D({ character, animated = false }: { character:
     };
     frame = requestAnimationFrame(render);
     return () => {
-      cancelAnimationFrame(frame); observer.disconnect();
+      cancelAnimationFrame(frame); observer.disconnect(); recovery.dispose();
       host.removeEventListener('pointerdown', down); host.removeEventListener('pointermove', move); host.removeEventListener('pointerup', up); host.removeEventListener('pointercancel', up); host.removeEventListener('lostpointercapture', up);
       disposeSceneGeometry(scene); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
-  }, [character, animated]);
+  }, [sceneKey, animated]);
   return <div ref={container} className="profile-character-3d" role="img" aria-label={`${character.name}, live 3D character.${animated ? '' : ' Drag to rotate.'}`} />;
 }

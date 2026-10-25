@@ -44,7 +44,7 @@ import { VoiceMicControl } from './components/VoiceMicControl';
 import { LandscapePrompt } from './components/LandscapePrompt';
 import { LoadingScreen } from './components/LoadingScreen';
 import { VolleyballCanvas } from './components/VolleyballCanvas';
-import { GunFightKillNotice, GunFightScore } from './components/GunFightHud';
+import { GunFightAmmo, GunFightKillNotice, GunFightScore } from './components/GunFightHud';
 import { backgroundAudioScene } from './audio/audioScene';
 import { PausePanel, MatchResults } from './components/MatchPanels';
 import { ActualMapThumbnail } from './components/ActualMapThumbnail';
@@ -729,7 +729,7 @@ export function App() {
     Object.assign(actionTriggerRef.current, {
       joystickActive: false, joystickX: 0, joystickY: 0,
       spikeRequested: false, diveRequested: false, superRequested: false,
-      liftRequested: false, jumpRequested: false, firingHeld: false, fireRequested: false,
+      liftRequested: false, jumpRequested: false, firingHeld: false, fireRequested: false, reloadRequested: false,
       throwRequested: false, dodgeRequested: false,
     });
   }, []);
@@ -2312,6 +2312,7 @@ export function App() {
       {/* ===================================================================== */}
       {gameState === 'PLAYING' && (
         <div className="gameplay-hud fixed inset-0 z-30 flex flex-col justify-between p-2 sm:p-3 safe-pad pointer-events-none">
+          {gameMode === 'obstacle_rush' && <GunFightAmmo hud={rushHud} />}
           {(gameMode === 'obstacle_rush' || gameMode === 'floor_is_lava') && (
             <GunFightKillNotice key={`${gameMode}-${rushRunKey}`} kills={(gameMode === 'obstacle_rush' ? rushHud.playerKills : lavaHud.playerKills) ?? 0} />
           )}

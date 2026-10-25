@@ -84,5 +84,5 @@ export function disposeSceneGeometry(scene: THREE.Object3D) {
     geometry.add(object.geometry);
     (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => materials.add(material));
   });
-  geometry.forEach(value => value.dispose()); materials.forEach(value => value.dispose());
+  geometry.forEach(value => value.dispose()); materials.forEach(value => { if (!value.userData.sharedCrayonResource) value.dispose(); });
 }

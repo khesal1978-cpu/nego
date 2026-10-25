@@ -225,6 +225,7 @@ export function addCrayonOutline(
       polygonOffsetUnits: 1,
     });
     outlineMaterialCache.set(outlineHex, outlineMat);
+    outlineMat.userData.sharedCrayonResource = true;
   }
 
   const outlineMesh = new THREE.Mesh(outlineGeo, outlineMat);

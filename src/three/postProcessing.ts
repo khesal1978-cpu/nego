@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { effectivePixelRatio, gameplayPixelRatio, getVisualCompare, getVisualSettings, publishRenderMetrics, type VisualSettings } from './visualSettings';
 import { createFrameBudget } from './frameBudget';
+import { bindWebGLRecovery } from './webglRecovery';
 
 export interface StylizedPostPipeline {
   setSize: (width: number, height: number) => void;
@@ -22,7 +23,10 @@ export function createStylizedPostPipeline(
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = options?.colorGrade ? 1.06 : 1.02;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  if (!options?.colorGrade) return { setSize: () => {}, render: () => renderer.render(scene, camera), dispose: () => {} };
+  if (!options?.colorGrade) {
+    const recovery = bindWebGLRecovery(renderer, scene, { resume: () => renderer.render(scene, camera) });
+    return { setSize: () => {}, render: () => { if (recovery.ready()) renderer.render(scene, camera); }, dispose: () => recovery.dispose() };
+  }
 
   const target = new THREE.WebGLRenderTarget(1, 1, { type: renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: 0 });
   const composer = new EffectComposer(renderer, target);
@@ -140,9 +144,10 @@ export function createStylizedPostPipeline(
       sizeDirty = false;
     }
   }
-  return {
+  const pipeline: StylizedPostPipeline = {
     setSize: (w, h) => { width = Math.max(1, w); height = Math.max(1, h); sizeDirty = true; },
     render: () => {
+      if (!recovery.ready()) return;
       const settings = getVisualSettings();
       const comparing = !options?.preview && getVisualCompare();
       if (settings !== lastSettings || comparing !== lastCompare || sizeDirty) {
@@ -167,8 +172,18 @@ export function createStylizedPostPipeline(
       }
     },
     dispose: () => {
+      recovery.dispose();
       bloom?.dispose(); grade.dispose(); fxaa.dispose(); composer.dispose();
       renderer.info.autoReset = originalAutoReset;
     },
   };
+  const recovery = bindWebGLRecovery(renderer, scene, {
+    restored: () => {
+      if (bloom) { composer.removePass(bloom); bloom.dispose(); bloom = undefined; }
+      composer.reset(); grade.material.needsUpdate = true; fxaa.material.needsUpdate = true;
+      lastSettings = undefined; sizeDirty = true;
+    },
+    resume: () => pipeline.render(),
+  });
+  return pipeline;
 }

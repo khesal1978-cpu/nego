@@ -59,8 +59,10 @@ a.current.fireRequested = false; byAction('fire').props.onPointerUp(pointer(2));
 assert(!m.gunFireRequested(false, a.current.firingHeld, false), 'Release stops firing even with a visible target');
 assert(a.current.joystickActive, 'Releasing Fire does not cancel movement');
 byAction('jump').props.onPointerDown(pointer(4)); assert(a.current.jumpRequested);
+byAction('reload').props.onPointerDown(pointer(40)); assert(a.current.reloadRequested, 'Reload button requests an early refill');
+byAction('reload').props.onPointerUp(pointer(40));
 byAction('move').props.onPointerCancel(pointer(1)); assert(!a.current.joystickActive && a.current.joystickX === 0);
-byAction('fire').props.onPointerDown(pointer(5)); listeners.get('blur')(); assert(!a.current.firingHeld);
+byAction('fire').props.onPointerDown(pointer(5)); listeners.get('blur')(); assert(!a.current.firingHeld && !a.current.reloadRequested);
 tree = render('nuke');
 for (const [action, field] of [['throw', 'throwRequested'], ['dodge', 'dodgeRequested'], ['jump', 'jumpRequested']]) { a.current[field] = false; byAction(action).props.onPointerDown(pointer(10 + action.length)); assert(a.current[field]); byAction(action).props.onPointerUp(pointer(10 + action.length)); }
 tree = render('volleyball');

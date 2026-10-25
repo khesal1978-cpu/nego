@@ -52,6 +52,7 @@ import { createArenaWeapon, createArenaMedkit } from '../three/arenaProps';
 import { createFortRoofGeometry, createFortSurfaceTexture, applyFortMasonryScale, createFortCoastShape, createFortHills, createFortSurfGeometry, getFortLandscapeHeight } from '../three/gunFightEnvironment';
 import { CustomSlotInfo, multiplayerClient } from '../network/multiplayerClient';
 import { damageAtDistance, GUN_WEAPONS, segmentBoxHit, segmentCylinderHit } from './gunFightCombat';
+import { applyGunMagazine, createGunActionSync, refillGunMagazine, spendGunRound, startGunReload, stepGunReload } from './gunMagazine';
 
 export interface ObstacleRushHudState {
   countdown: number;
@@ -73,6 +74,10 @@ export interface ObstacleRushHudState {
   targetTeamScore?: number;
   weaponName?: string;
   weaponTimerSec?: number;
+  ammo?: number;
+  magazineSize?: number;
+  reloadRemaining?: number;
+  reloadDuration?: number;
   superChargePct?: number;
   killFeedText?: string;
   respawnSec?: number;
@@ -116,6 +121,7 @@ interface ObstacleRushCanvasProps {
     jumpRequested?: boolean;
     firingHeld?: boolean;
     fireRequested?: boolean;
+    reloadRequested?: boolean;
     joystickX?: number;
     joystickY?: number;
     joystickActive?: boolean;
@@ -261,6 +267,8 @@ interface ArenaFighter {
   hpBarBg: THREE.Mesh;
   weaponType: ArenaWeaponType;
   weaponTimer: number;
+  ammo: number;
+  reloadRemaining: number;
   burnTimer: number;
   burnTickTimer: number;
   burnedById: string | null;
@@ -2003,6 +2011,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         hpBarBg,
         weaponType: 'assault',
         weaponTimer: 0,
+        ammo: GUN_WEAPONS.assault.magazine,
+        reloadRemaining: 0,
         burnTimer: 0,
         burnTickTimer: 0,
         burnedById: null,
@@ -2136,6 +2146,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
 
     const playerFighter = fighters[0];
     const matchSync = createMatchSync('obstacle_rush', Boolean(activeCustomSlots) && !onPreview);
+    const gunActions = createGunActionSync();
+    let playerReloadSoundPending = false;
     const remoteControlled = (f: ArenaFighter) => Boolean(f.remotePlayerId || (matchSync.active() && !matchSync.authority() && !f.isPlayer));
     let lockedTargetId: string | null = null;
     let damagePulse = 0;
@@ -2152,6 +2164,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       actionTriggerRef.current.jumpRequested = false;
       actionTriggerRef.current.firingHeld = false;
       actionTriggerRef.current.fireRequested = false;
+      actionTriggerRef.current.reloadRequested = false;
     };
 
     // 5. Keyboard Controls
@@ -2162,6 +2175,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       keys[e.code] = true;
       if (e.repeat) return;
       if (e.code === 'KeyF') actionTriggerRef.current.fireRequested = true;
+      if (e.code === 'KeyR') actionTriggerRef.current.reloadRequested = true;
       if (e.code === 'Space') {
         actionTriggerRef.current.jumpRequested = true;
       }
@@ -2290,6 +2304,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       if (victim.respawnTimer > 0) return;
       victim.deaths += 1;
       victim.hp = 0;
+      victim.reloadRemaining = 0;
+      if (victim.isPlayer) playerReloadSoundPending = false;
       matchSync.invalidate();
       victim.lastDamagedById = killerId;
       victim.killStreak = 0;
@@ -2337,13 +2353,26 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
     const setFighterEquippedWeapon = (
       fighter: ArenaFighter,
       wType: ArenaWeaponType,
-      durationSec: number
+      durationSec: number,
+      refillAmmo = true
     ) => {
       fighter.weaponType = wType;
       fighter.weaponTimer = durationSec;
+      if (refillAmmo) refillGunMagazine(fighter);
       fighter.assaultMeshGroup.visible = wType === 'assault';
       fighter.shotgunMeshGroup.visible = wType === 'shotgun';
       fighter.fireMeshGroup.visible = wType === 'fire';
+    };
+
+    const reloadFighter = (fighter: ArenaFighter, remote = false) => {
+      if (fighter.hp <= 0 || fighter.respawnTimer > 0 || countdownSec > 0 || matchEnded || !startGunReload(fighter)) return false;
+      if (fighter.isPlayer) { hudSyncAccum = 1; playerReloadSoundPending = true; crayonAudio.playGunReload(); }
+      matchSync.invalidate();
+      if (!remote && matchSync.active()) {
+        const actionId = gunActions.issue(fighter.spawnIndex, performance.now());
+        multiplayerClient.sendGameEvent('gun:reload', { slotIndex: fighter.spawnIndex, weapon: fighter.weaponType, actionId });
+      }
+      return true;
     };
 
     const fireFighterBlaster = (
@@ -2354,6 +2383,15 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       replayRemote = false
     ) => {
       if (!replayRemote && !fighter.isPlayer && matchSync.active() && !matchSync.authority()) return;
+      if (fighter.hp <= 0 || fighter.respawnTimer > 0 || countdownSec > 0 || matchEnded) return;
+      // The host checks remote magazines too; guest replay only renders the shot.
+      if (!replayRemote || matchSync.authority()) {
+        if (!replayRemote && fighter.fireCooldown > 0) return;
+        const wasReloading = fighter.reloadRemaining > 0;
+        if (!spendGunRound(fighter)) return;
+        if (!wasReloading && fighter.reloadRemaining > 0 && fighter.isPlayer) { playerReloadSoundPending = true; crayonAudio.playGunReload(); }
+        matchSync.invalidate();
+      }
       if (!replayRemote) {
         if (fighter.fireCooldown > 0 || fighter.respawnTimer > 0) return;
         // Firing ends spawn protection, so it cannot be used to attack safely.
@@ -2366,7 +2404,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       const wType = fighter.weaponType;
       const humanFighter = fighter.isPlayer || Boolean(fighter.remotePlayerId);
       if (!replayRemote && matchSync.active() && (fighter.isPlayer || matchSync.authority())) {
-        multiplayerClient.sendGameEvent('gun:fire', { slotIndex: fighter.spawnIndex, aimYaw: targetYaw, targetY, dist: targetDist, weapon: wType });
+        const actionId = gunActions.issue(fighter.spawnIndex, performance.now());
+        multiplayerClient.sendGameEvent('gun:fire', { slotIndex: fighter.spawnIndex, aimYaw: targetYaw, targetY, dist: targetDist, weapon: wType, actionId });
       }
       const aiRateMult = Math.max(0.75, Math.min(1.25, diffConfig.rushSpeedMult));
       // Player skill bonus: active jiggle-strafing, jumping, or killstreaks speed up fire cadence & boost crit damage!
@@ -2762,7 +2801,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
     const motionFields = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'targetFacingYaw'] as const;
     const captureMatch = () => ({
       countdownSec, matchElapsedSec, effectiveMatchDurationSec, isOvertimeRound, matchEnded,
-      fighters: fighters.map(f => ({ slot: f.spawnIndex, ...numericState(f, sharedFields), ...numericState(f, motionFields), weapon: f.weaponType, damagedBySlot: fighters.find(other => other.id === f.lastDamagedById)?.spawnIndex })),
+      gunActions: gunActions.capture(),
+      fighters: fighters.map(f => ({ slot: f.spawnIndex, ...numericState(f, sharedFields), ...numericState(f, motionFields), ...numericState(f, ['ammo', 'reloadRemaining']), weapon: f.weaponType, damagedBySlot: fighters.find(other => other.id === f.lastDamagedById)?.spawnIndex })),
       medkits: medkits.map(m => ({ ...numericState(m, ['x', 'y', 'z', 'spotIndex', 'respawnTimer']), active: m.active })),
       weapons: weaponPickups.map(w => ({ ...numericState(w, ['x', 'y', 'z', 'spotIndex', 'respawnTimer']), active: w.active, weapon: w.weaponType })),
     });
@@ -2821,6 +2861,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           const f = fighters.find(item => item.spawnIndex === state.slot);
           if (!f) continue;
           const wasDead = f.respawnTimer > 0;
+          const weaponChanged = state.weapon !== f.weaponType;
           const playerHit = state.damagedBySlot === playerFighter.spawnIndex;
           if (state.hp < f.hp) {
             f.hitFlashTimer = .2; f.timeSinceLastHit = 0;
@@ -2850,7 +2891,10 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
             f.group.position.set(f.x, f.y, f.z);
           }
           f.group.visible = f.respawnTimer <= 0;
-          if (['assault', 'shotgun', 'fire'].includes(state.weapon)) setFighterEquippedWeapon(f, state.weapon, f.weaponTimer);
+          if (['assault', 'shotgun', 'fire'].includes(state.weapon)) {
+            setFighterEquippedWeapon(f, state.weapon, f.weaponTimer, false);
+            if (!f.isPlayer || gunActions.canApply(f.spawnIndex, p.gunActions, performance.now(), wasDead || f.respawnTimer > 0 || weaponChanged || p.matchEnded)) applyGunMagazine(f, state);
+          }
         }
         for (const [items, states] of [[medkits, p.medkits], [weaponPickups, p.weapons]] as const) {
           if (!Array.isArray(states)) continue;
@@ -2871,10 +2915,14 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         if (p.matchEnded && !matchEnded) finishMatch();
         return;
       }
-      if (evt.eventKind === 'gun:fire' && evt.payload) {
+      if ((evt.eventKind === 'gun:fire' || evt.eventKind === 'gun:reload') && evt.payload) {
         const fromHost = evt.senderId === multiplayerClient.currentRoom?.hostId;
         const remoteF = fighters.find(f => !f.isPlayer && (fromHost ? f.spawnIndex === evt.payload.slotIndex : f.remotePlayerId === evt.senderId));
         if (remoteF && remoteF.respawnTimer <= 0) {
+          if (!gunActions.receive(remoteF.spawnIndex, evt.payload.actionId, performance.now())) return;
+          matchSync.invalidate();
+          if (matchSync.authority() && evt.payload.weapon !== remoteF.weaponType) return;
+          if (evt.eventKind === 'gun:reload') { reloadFighter(remoteF, true); return; }
           const remoteYaw = Number(evt.payload.aimYaw);
           if (!Number.isFinite(remoteYaw)) return;
           if (!matchSync.authority() && (evt.payload.weapon === 'assault' || evt.payload.weapon === 'shotgun' || evt.payload.weapon === 'fire')) {
@@ -2922,6 +2970,10 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
 
       weather.update(rawDt, camera);
       const dt = rawDt * speedMultRef.current;
+      if (actionTriggerRef.current.reloadRequested) {
+        reloadFighter(playerFighter);
+        actionTriggerRef.current.reloadRequested = false;
+      }
       damagePulse = Math.max(0, damagePulse - rawDt * 2.8);
       while (killFeed.length && killFeed[killFeed.length - 1].expiresAt < now) killFeed.pop();
 
@@ -3189,13 +3241,17 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
             f.spawnShieldGroup.visible = false;
           }
           if (f.fireCooldown > 0) f.fireCooldown = Math.max(0, f.fireCooldown - dt);
+          if (stepGunReload(f, dt)) {
+            matchSync.invalidate();
+            if (f.isPlayer) { hudSyncAccum = 1; if (playerReloadSoundPending) crayonAudio.playGunReload(true); playerReloadSoundPending = false; }
+          }
           if (f.aiReactionTimer > 0) f.aiReactionTimer = Math.max(0, f.aiReactionTimer - dt);
           if (f.aimHoldTimer > 0) f.aimHoldTimer = Math.max(0, f.aimHoldTimer - dt);
           if (f.speedBoostTimer > 0)
             f.speedBoostTimer = Math.max(0, f.speedBoostTimer - dt);
 
           // Power Weapon Duration Countdown (Reverts to Assault Blaster when expired)
-          if (f.weaponType !== 'assault') {
+          if (f.weaponType !== 'assault' && matchSync.authority()) {
             f.weaponTimer -= dt;
             if (f.weaponTimer <= 0) {
               setFighterEquippedWeapon(f, 'assault', 0);
@@ -3311,10 +3367,13 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           if (f.gunRecoil > 0) {
             f.gunRecoil = Math.max(0, f.gunRecoil - dt * 1.4);
           }
-          f.gunGroup.position.z = 0.27 - f.gunRecoil * 0.4;
-          f.gunGroup.rotation.x = -f.gunRecoil * 0.24;
-          f.rig.rightArm.rotation.x = -1.12 - f.gunRecoil * 0.2;
-          f.rig.leftArm.rotation.x = -1.18 - f.gunRecoil * 0.2;
+          const reloadPose = f.reloadRemaining > 0 ? Math.sin(Math.PI * (1 - f.reloadRemaining / GUN_WEAPONS[f.weaponType].reloadSec)) : 0;
+          f.gunGroup.position.y = .67 - reloadPose * .1;
+          f.gunGroup.position.z = 0.27 - f.gunRecoil * 0.4 - reloadPose * .07;
+          f.gunGroup.rotation.x = -f.gunRecoil * 0.24 + reloadPose * .4;
+          f.gunGroup.rotation.z = -reloadPose * .25;
+          f.rig.rightArm.rotation.x = -1.12 - f.gunRecoil * 0.2 + reloadPose * .4;
+          f.rig.leftArm.rotation.x = -1.18 - f.gunRecoil * 0.2 + reloadPose * .65;
 
           const flashMat = f.muzzleFlashMesh.material as THREE.MeshBasicMaterial;
           if (flashMat.opacity > 0) {
@@ -3699,7 +3758,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
             f.grounded = true;
           }
 
-          // Auto-fire uses the same visible-target rule in solo and custom matches.
+          // Aim assistance never fires without the player's Fire input.
           if (f.isPlayer) {
             let bestTarget: ArenaFighter | null = null;
             let bestDist = GUN_WEAPONS[f.weaponType].range;
@@ -4074,7 +4133,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       hudSyncAccum += rawDt;
       bloodFeedback.update(dt);
       ragdolls.update(dt);
-      const visibleHudKey = `${Math.ceil(countdownSec)}:${Math.ceil(Math.max(0, effectiveMatchDurationSec - matchElapsedSec))}:${Math.round(playerFighter.hp)}:${playerFighter.maxHp}:${playerFighter.kills}:${playerFighter.deaths}:${Math.ceil(playerFighter.respawnTimer)}:${fighters.map(f => `${f.kills},${f.deaths}`).join(';')}`;
+      const visibleHudKey = `${Math.ceil(countdownSec)}:${Math.ceil(Math.max(0, effectiveMatchDurationSec - matchElapsedSec))}:${Math.round(playerFighter.hp)}:${playerFighter.maxHp}:${playerFighter.kills}:${playerFighter.deaths}:${Math.ceil(playerFighter.respawnTimer)}:${playerFighter.weaponType}:${playerFighter.ammo}:${Math.ceil(playerFighter.reloadRemaining * 10)}:${fighters.map(f => `${f.kills},${f.deaths}`).join(';')}`;
       if (hudSyncAccum >= 0.1 && visibleHudKey !== lastVisibleHudKey) {
         hudSyncAccum = 0;
         lastVisibleHudKey = visibleHudKey;
@@ -4121,6 +4180,10 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                 ? 'FIRE'
                 : 'ASSAULT',
           weaponTimerSec: playerFighter.weaponTimer,
+          ammo: playerFighter.ammo,
+          magazineSize: GUN_WEAPONS[playerFighter.weaponType].magazine,
+          reloadRemaining: playerFighter.reloadRemaining,
+          reloadDuration: GUN_WEAPONS[playerFighter.weaponType].reloadSec,
           respawnSec: Math.max(0, playerFighter.respawnTimer),
           shieldSec: playerFighter.invulnTimer,
           killStreak: playerFighter.killStreak,

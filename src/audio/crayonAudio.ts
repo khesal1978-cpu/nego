@@ -854,6 +854,25 @@ class CrayonAudioEngine {
     this.playMedkitPickup();
   }
 
+  public playGunReload(completed = false) {
+    const ctx = this.getContext();
+    if (!ctx || this.sfxVolume <= .01) return;
+    const duration = completed ? .045 : .075;
+    const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+    const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+    source.buffer = buffer;
+    filter.type = 'bandpass'; filter.frequency.value = completed ? 1400 : 850; filter.Q.value = .7;
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(this.scaleGain(.075), now + .003);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+    source.connect(filter); filter.connect(gain); gain.connect(this.sfxInput!);
+    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
+    source.start(now); source.stop(now + duration);
+  }
+
   /**
    * GUN FIGHT: Crisp Bullet Impact Hit Marker (/sfx/bullet_hit.wav)
    */

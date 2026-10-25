@@ -1,11 +1,11 @@
 export type ControlFamily = 'gun' | 'nuke' | 'volleyball';
-export type TouchAction = 'move' | 'fire' | 'jump' | 'throw' | 'dodge' | 'spike' | 'dive' | 'lift' | 'super';
+export type TouchAction = 'move' | 'fire' | 'reload' | 'jump' | 'throw' | 'dodge' | 'spike' | 'dive' | 'lift' | 'super';
 export type TouchButton = { x: number; y: number; size: number; opacity: number };
 export type TouchLayouts = Record<ControlFamily, Partial<Record<TouchAction, TouchButton>>>;
 export interface TouchGameActions {
   spikeRequested: boolean; diveRequested: boolean; superRequested: boolean;
   liftRequested?: boolean; jumpRequested?: boolean;
-  firingHeld?: boolean; fireRequested?: boolean;
+  firingHeld?: boolean; fireRequested?: boolean; reloadRequested?: boolean;
   throwRequested?: boolean; dodgeRequested?: boolean;
   joystickX?: number; joystickY?: number; joystickActive?: boolean;
 }
@@ -16,7 +16,7 @@ const LEGACY_TOUCH_LAYOUTS: TouchLayouts = {
   volleyball: { move: button(14, 76, 112, .6), spike: button(88, 65, 72, .6), dive: button(77, 83, 56, .6), lift: button(95, 42, 54, .6), super: button(78, 43, 54, .6) },
 };
 export const DEFAULT_TOUCH_LAYOUTS: TouchLayouts = {
-  gun: { move: button(14, 76, 110, .6), fire: button(88, 56, 78, .8), jump: button(92, 83, 58) },
+  gun: { move: button(14, 76, 110, .6), fire: button(88, 56, 78, .8), jump: button(92, 83, 58), reload: button(77, 82, 54) },
   nuke: { move: button(14, 76, 110, .6), throw: button(88, 56, 78, .8), dodge: button(77, 82, 56), jump: button(92, 83, 58) },
   volleyball: { move: button(14, 76, 110, .6), spike: button(88, 56, 78, .8), dive: button(77, 82, 56), lift: button(77, 38, 52), super: button(92, 29, 52) },
 };
