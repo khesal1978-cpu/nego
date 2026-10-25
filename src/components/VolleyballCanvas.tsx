@@ -1,6 +1,7 @@
 import type { TouchGameActions } from './touchControlLayout';
 import { volleyballAiFlight } from './volleyballShot';
 import { createFramePacer } from '../three/framePacing';
+import { createMotionTrail } from '../three/motionTrail';
 import { createWeather } from '../three/weather';
 import { volleyballControl } from '../network/playerControl';
 import { isVolleyballMode, volleyballActorPrefix } from '../network/customModes';
@@ -448,21 +449,19 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
     };
 
     // Ball Trail Ribbon Spheres (Sky Cyan, Rose Pink, Violet, Emerald — zero yellow!)
-    const TRAIL_COUNT = 14;
+    const TRAIL_COUNT = 10;
     const trailGeo = new THREE.SphereGeometry(0.22, 10, 10);
     const trailMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.48,
     });
     const trailInstanced = new THREE.InstancedMesh(trailGeo, trailMat, TRAIL_COUNT);
     trailInstanced.frustumCulled = false;
     scene.add(trailInstanced);
 
-    const trailHistory: Array<{ x: number; y: number; z: number }> = Array.from(
-      { length: TRAIL_COUNT },
-      () => ({ x: 0, y: -10, z: 0 })
-    );
+    const motionTrail = createMotionTrail(TRAIL_COUNT);
+    const trailHistory = motionTrail.points;
     const rainbowColors = [
       0x38bdf8, 0xf43f5e, 0xa855f7, 0x10b981, 0xec4899, 0x6366f1,
     ];
@@ -3007,26 +3006,14 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       }
 
       // Update Ball Trail (Zero yellow!)
-      for (let t = TRAIL_COUNT - 1; t > 0; t--) {
-        trailHistory[t].x = trailHistory[t - 1].x;
-        trailHistory[t].y = trailHistory[t - 1].y;
-        trailHistory[t].z = trailHistory[t - 1].z;
-      }
-      trailHistory[0].x = gameData.bx;
-      trailHistory[0].y = gameData.by;
-      trailHistory[0].z = gameData.bz;
+      const trailActive = vfxEnabled && currentState === 'PLAYING' && gameData.phase === 'RALLY';
+      motionTrail.update(gameData.bx, gameData.by, gameData.bz, dt, trailActive);
+      trailInstanced.visible = trailActive;
 
-      for (let t = 0; t < TRAIL_COUNT; t++) {
+      for (let t = 0; trailActive && t < TRAIL_COUNT; t++) {
         const pt = trailHistory[t];
-        const s =
-          vfxEnabled && currentState === 'PLAYING' && gameData.phase === 'RALLY'
-            ? (1 - t / TRAIL_COUNT) *
-              (gameData.isSuperSmash
-                ? 1.55
-                : gameData.isRainbowSmash
-                  ? 1.15
-                  : 0.65)
-            : 0.0001;
+        const s = (1 - t / TRAIL_COUNT) *
+          (gameData.isSuperSmash ? 1.1 : gameData.isRainbowSmash ? .9 : .5);
         _dummyParticle.position.set(pt.x, pt.y, pt.z);
         _dummyParticle.scale.setScalar(s);
         _dummyParticle.updateMatrix();
@@ -3038,9 +3025,9 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         );
         trailInstanced.setColorAt(t, _tempColor);
       }
-      trailInstanced.instanceMatrix.needsUpdate = true;
-      if (trailInstanced.instanceColor) {
-        trailInstanced.instanceColor.needsUpdate = true;
+      if (trailActive) {
+        trailInstanced.instanceMatrix.needsUpdate = true;
+        if (trailInstanced.instanceColor) trailInstanced.instanceColor.needsUpdate = true;
       }
 
       // Update 3D Particles ONLY when active particles exist (120 FPS optimization!)

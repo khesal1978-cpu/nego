@@ -1,7 +1,7 @@
 export type GunWeapon = 'assault' | 'shotgun' | 'fire';
 
 export const GUN_WEAPONS = {
-  assault: { magazine: 24, reloadSec: 1.35, range: 24, label: 'Assault blaster' },
+  assault: { magazine: 30, reloadSec: 1.35, range: 24, label: 'Assault blaster' },
   shotgun: { magazine: 5, reloadSec: 1.7, range: 15, label: 'Pump shotgun' },
   fire: { magazine: 48, reloadSec: 1.85, range: 11, label: 'Fire blaster' },
 } satisfies Record<GunWeapon, { magazine: number; reloadSec: number; range: number; label: string }>;

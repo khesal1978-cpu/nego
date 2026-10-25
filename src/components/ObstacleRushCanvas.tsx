@@ -48,11 +48,13 @@ import {
   setLiveRushMapThumbnail,
 } from '../three/crayonModels';
 import { crayonAudio } from '../audio/crayonAudio';
-import { createArenaWeapon, createArenaMedkit } from '../three/arenaProps';
+import { createArenaWeapon, createArenaMedkit, createArenaAmmoCrate } from '../three/arenaProps';
 import { createFortRoofGeometry, createFortSurfaceTexture, applyFortMasonryScale, createFortCoastShape, createFortHills, createFortSurfGeometry, getFortLandscapeHeight } from '../three/gunFightEnvironment';
 import { CustomSlotInfo, multiplayerClient } from '../network/multiplayerClient';
 import { damageAtDistance, GUN_WEAPONS, segmentBoxHit, segmentCylinderHit } from './gunFightCombat';
-import { applyGunMagazine, createGunActionSync, refillGunMagazine, spendGunRound, startGunReload, stepGunReload } from './gunMagazine';
+import { applyGunMagazine, createGunActionSync, equipGunWeapon, resetGunAmmo, spendGunRound, startGunReload, stepGunReload } from './gunMagazine';
+import { collectGunAmmoPickup, createGunAmmoPickups, stepGunAmmoPickups } from './gunAmmoPickups';
+import { createCombatVisualPool, createImpactGate } from '../three/combatVisualPool';
 
 export interface ObstacleRushHudState {
   countdown: number;
@@ -75,6 +77,7 @@ export interface ObstacleRushHudState {
   weaponName?: string;
   weaponTimerSec?: number;
   ammo?: number;
+  reserveAmmo?: number;
   magazineSize?: number;
   reloadRemaining?: number;
   reloadDuration?: number;
@@ -268,6 +271,8 @@ interface ArenaFighter {
   weaponType: ArenaWeaponType;
   weaponTimer: number;
   ammo: number;
+  reserveAmmo: number;
+  assaultAmmo: number;
   reloadRemaining: number;
   burnTimer: number;
   burnTickTimer: number;
@@ -1735,6 +1740,15 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
     createRandomMedkitSlot(firstMedIdx, true, 0);
     createRandomMedkitSlot((firstMedIdx + 3) % MEDKIT_CANDIDATE_SPOTS.length, false, 11.0);
 
+    const ammoPickups: MedkitPickup[] = createGunAmmoPickups().map(pickup => {
+      const mesh = createArenaAmmoCrate(); mesh.position.set(pickup.x, pickup.y + .5, pickup.z);
+      const ringMesh = new THREE.Mesh(new THREE.RingGeometry(.5, .59, 24), new THREE.MeshBasicMaterial({ color: '#F3C875', side: THREE.DoubleSide, transparent: true, opacity: .8 }));
+      ringMesh.rotation.x = -Math.PI / 2; ringMesh.position.set(pickup.x, pickup.y + .04, pickup.z);
+      mesh.visible = ringMesh.visible = pickup.active;
+      worldGroup.add(mesh, ringMesh);
+      return { ...pickup, mesh, ringMesh };
+    });
+
     // 3B. RANDOM SPAWNING POWER WEAPONS: PUMP SHOTGUN & BLAZING FIRE BLASTER!
     const WEAPON_SPAWN_SPOTS: Array<{ x: number; y: number; z: number }> = [
       { x: -8.8, y: 1.92, z: 1.5 }, // West Supply Terrace
@@ -2012,6 +2026,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         weaponType: 'assault',
         weaponTimer: 0,
         ammo: GUN_WEAPONS.assault.magazine,
+        reserveAmmo: 90,
+        assaultAmmo: GUN_WEAPONS.assault.magazine,
         reloadRemaining: 0,
         burnTimer: 0,
         burnTickTimer: 0,
@@ -2235,6 +2251,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
 
     // 7. Stylized 3D Hit & Kill Effects (Shockwave Rings, Speed Streaks, Starbursts & Light Pillars)
     let screenShakeMag = 0;
+    const combatVisuals = createCombatVisualPool();
+    const allowImpact = createImpactGate();
 
     const bloodFeedback = createBloodFeedback(scene);
     const ragdolls = createCharacterRagdolls(scene, (x, z, y) => getFloorHeightAt(x, z, y));
@@ -2248,17 +2266,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       hz: number,
       colorHex: string
     ) => {
-      if (!enableVfxRef.current) return;
-
-      const rGeo = new THREE.RingGeometry(0.18, 0.36, 24);
-      rGeo.rotateX(-Math.PI / 2);
-      const rMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.92,
-      });
-      const rMesh = new THREE.Mesh(rGeo, rMat);
+      if (!enableVfxRef.current || vfxParticles.length > 72 || !allowImpact(hx, hy, hz, performance.now())) return;
+      const rMesh = combatVisuals.take('ring', colorHex);
       rMesh.position.set(hx, hy, hz);
       scene.add(rMesh);
       vfxParticles.push({
@@ -2271,18 +2280,14 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         kind: 'ring',
       });
 
-      const streakMat = new THREE.MeshBasicMaterial({ color: '#FEF08A' });
-      const accentMat = new THREE.MeshBasicMaterial({ color: colorHex });
-      for (let i = 0; i < 7; i++) {
-        const ang = (i / 7) * Math.PI * 2 + Math.random() * 0.4;
-        const spd = 4.5 + Math.random() * 5.5;
-        const vy = 1.5 + Math.random() * 3.8;
+      for (let i = 0; i < 3; i++) {
+        const ang = (i / 3) * Math.PI * 2 + Math.random() * 0.4;
+        const spd = 3 + Math.random() * 3;
+        const vy = 1 + Math.random() * 2;
         const vx = Math.cos(ang) * spd;
         const vz = Math.sin(ang) * spd;
 
-        const sGeo = new THREE.ConeGeometry(0.065, 0.42, 6);
-        sGeo.rotateX(Math.PI / 2);
-        const sMesh = new THREE.Mesh(sGeo, i % 2 === 0 ? streakMat : accentMat);
+        const sMesh = combatVisuals.take('streak', i % 2 === 0 ? '#FEF08A' : colorHex);
         sMesh.position.set(hx, hy, hz);
         sMesh.lookAt(hx + vx, hy + vy, hz + vz);
         scene.add(sMesh);
@@ -2339,7 +2344,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         killer.jiggleVelY += 4.2;
 
         if (killer.isPlayer && enableShakeRef.current) {
-          screenShakeMag = 0.35;
+          screenShakeMag = 0.18;
         }
       }
       // Play expressive KO / Death sound for player deaths, player kills, and arena KOs!
@@ -2356,9 +2361,10 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       durationSec: number,
       refillAmmo = true
     ) => {
-      fighter.weaponType = wType;
+      if (refillAmmo) equipGunWeapon(fighter, wType);
+      else fighter.weaponType = wType;
       fighter.weaponTimer = durationSec;
-      if (refillAmmo) refillGunMagazine(fighter);
+      if (refillAmmo && fighter.isPlayer) playerReloadSoundPending = false;
       fighter.assaultMeshGroup.visible = wType === 'assault';
       fighter.shotgunMeshGroup.visible = wType === 'shotgun';
       fighter.fireMeshGroup.visible = wType === 'fire';
@@ -2458,12 +2464,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       const spawnZ =
         fighter.z + baseDirZ * forwardOffset - Math.sin(targetYaw) * 0.12;
 
-      if (enableVfxRef.current && fighter.isPlayer && wType !== 'fire') {
-        const shellGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.11, 6);
-        const shellMat = new THREE.MeshBasicMaterial({
-          color: wType === 'shotgun' ? '#EF4444' : '#FACC15',
-        });
-        const shellMesh = new THREE.Mesh(shellGeo, shellMat);
+      if (enableVfxRef.current && fighter.isPlayer && wType !== 'fire' && vfxParticles.length < 72) {
+        const shellMesh = combatVisuals.take('shell', wType === 'shotgun' ? '#EF4444' : '#FACC15');
         shellMesh.position.set(
           fighter.x + Math.cos(targetYaw) * 0.34,
           fighter.y + 1.05,
@@ -2501,26 +2503,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           const pdx = Math.sin(pYaw);
           const pdz = Math.cos(pYaw);
 
-          const bGrp = new THREE.Group();
+          const bGrp = combatVisuals.take('shotgun', '#FACC15');
           bGrp.position.set(spawnX, spawnY, spawnZ);
           bGrp.rotation.y = pYaw;
-
-          const pelletMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.13, 8, 8),
-            new THREE.MeshBasicMaterial({ color: '#FACC15' })
-          );
-          bGrp.add(pelletMesh);
-
-          const trailMesh = new THREE.Mesh(
-            new THREE.CapsuleGeometry(0.08, 0.28, 6, 6),
-            new THREE.MeshBasicMaterial({
-              color: '#F97316',
-              transparent: true,
-              opacity: 0.82,
-            })
-          );
-          trailMesh.rotation.x = Math.PI / 2;
-          bGrp.add(trailMesh);
           scene.add(bGrp);
 
           bullets.push({
@@ -2554,24 +2539,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           flameVy += THREE.MathUtils.clamp((targetY - spawnY) / timeToTarget, -6.0, 6.0);
         }
 
-        const bGrp = new THREE.Group();
+        const bGrp = combatVisuals.take('fire', Math.random() < .5 ? '#F97316' : '#EF4444');
         bGrp.position.set(spawnX, spawnY, spawnZ);
-
-        const innerCore = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.21, 0),
-          new THREE.MeshBasicMaterial({ color: '#FEF08A' })
-        );
-        bGrp.add(innerCore);
-
-        const outerFlame = new THREE.Mesh(
-          new THREE.SphereGeometry(0.32, 10, 8),
-          new THREE.MeshBasicMaterial({
-            color: Math.random() < 0.5 ? '#F97316' : '#EF4444',
-            transparent: true,
-            opacity: 0.82,
-          })
-        );
-        bGrp.add(outerFlame);
         scene.add(bGrp);
 
         bullets.push({
@@ -2594,20 +2563,14 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         });
       } else {
         // Default Assault Blaster Bolt
-        const bGrp = new THREE.Group();
-        bGrp.position.set(spawnX, spawnY, spawnZ);
-        bGrp.rotation.y = targetYaw;
-
         const bulletColor = fighter.isPlayer
           ? isSkillShot
             ? '#FACC15'
             : '#FEF08A'
           : fighter.dressColor;
-        const coreGeo = new THREE.CapsuleGeometry(0.11, 0.34, 6, 8);
-        coreGeo.rotateX(Math.PI / 2);
-        const coreMat = new THREE.MeshBasicMaterial({ color: bulletColor });
-        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-        bGrp.add(coreMesh);
+        const bGrp = combatVisuals.take('assault', bulletColor);
+        bGrp.position.set(spawnX, spawnY, spawnZ);
+        bGrp.rotation.y = targetYaw;
 
         scene.add(bGrp);
 
@@ -2802,8 +2765,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
     const captureMatch = () => ({
       countdownSec, matchElapsedSec, effectiveMatchDurationSec, isOvertimeRound, matchEnded,
       gunActions: gunActions.capture(),
-      fighters: fighters.map(f => ({ slot: f.spawnIndex, ...numericState(f, sharedFields), ...numericState(f, motionFields), ...numericState(f, ['ammo', 'reloadRemaining']), weapon: f.weaponType, damagedBySlot: fighters.find(other => other.id === f.lastDamagedById)?.spawnIndex })),
+      fighters: fighters.map(f => ({ slot: f.spawnIndex, ...numericState(f, sharedFields), ...numericState(f, motionFields), ...numericState(f, ['ammo', 'reserveAmmo', 'assaultAmmo', 'reloadRemaining']), weapon: f.weaponType, damagedBySlot: fighters.find(other => other.id === f.lastDamagedById)?.spawnIndex })),
       medkits: medkits.map(m => ({ ...numericState(m, ['x', 'y', 'z', 'spotIndex', 'respawnTimer']), active: m.active })),
+      ammoPickups: ammoPickups.map(m => ({ ...numericState(m, ['x', 'y', 'z', 'spotIndex', 'respawnTimer']), active: m.active })),
       weapons: weaponPickups.map(w => ({ ...numericState(w, ['x', 'y', 'z', 'spotIndex', 'respawnTimer']), active: w.active, weapon: w.weaponType })),
     });
     const finishMatch = () => {
@@ -2815,16 +2779,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         0, playerFighter.deaths, playerFighter.kills, 100,
         standings.map(f => ({ id: f.id, name: f.name, kills: f.kills, deaths: f.deaths, isPlayer: f.isPlayer, charId: f.charConfig.id })));
     };
-    const pendingMaterials = new Set<THREE.Material>();
-    const releaseEffect = (object: THREE.Object3D) => {
-      scene.remove(object);
-      object.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          for (const material of Array.isArray(child.material) ? child.material : [child.material]) pendingMaterials.add(material);
-        }
-      });
-    };
+    const releaseEffect = (object: THREE.Object3D) => { combatVisuals.release(object); };
 
     // Subscribe to real-time remote player state ticks & weapon fire events
     const ownerTickTimes = new WeakMap<ArenaFighter, number>();
@@ -2896,7 +2851,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
             if (!f.isPlayer || gunActions.canApply(f.spawnIndex, p.gunActions, performance.now(), wasDead || f.respawnTimer > 0 || weaponChanged || p.matchEnded)) applyGunMagazine(f, state);
           }
         }
-        for (const [items, states] of [[medkits, p.medkits], [weaponPickups, p.weapons]] as const) {
+        for (const [items, states] of [[medkits, p.medkits], [ammoPickups, p.ammoPickups], [weaponPickups, p.weapons]] as const) {
           if (!Array.isArray(states)) continue;
           items.forEach((item, index) => {
             const state = states[index]; if (!state) return;
@@ -3048,6 +3003,16 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         }
       });
 
+      if (matchSync.authority() && stepGunAmmoPickups(ammoPickups, rawDt)) matchSync.invalidate();
+      ammoPickups.forEach((pickup, idx) => {
+        pickup.mesh.visible = pickup.ringMesh.visible = pickup.active;
+        if (pickup.active) {
+          pickup.ringMesh.position.set(pickup.x, pickup.y + .04, pickup.z);
+          pickup.mesh.rotation.y = now * .002 + idx;
+          pickup.mesh.position.set(pickup.x, pickup.y + .5 + Math.sin(now * .004 + idx) * .1, pickup.z);
+        }
+      });
+
       weaponPickups.forEach((wp, idx) => {
         if (!wp.active) {
           if (!matchSync.authority()) return;
@@ -3171,6 +3136,8 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
               f.hpBarFill.visible = false;
               f.burnTimer = 0;
               setFighterEquippedWeapon(f, 'assault', 0);
+
+              resetGunAmmo(f);
 
               // Pick the safest spawn point farthest from all currently living fighters so characters NEVER spawn on top of each other!
               let bestSp = SOLO_SPAWN_POINTS[0];
@@ -3325,6 +3292,21 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                 spawnStylizedHitEffect(mk.x, mk.y + 0.5, mk.z, '#4ADE80');
                 break;
               }
+            }
+          }
+
+          if (matchSync.authority()) {
+            for (const pickup of ammoPickups) {
+              const wasReloading = f.reloadRemaining > 0;
+              if (!collectGunAmmoPickup(pickup, f)) continue;
+              pickup.mesh.visible = pickup.ringMesh.visible = false;
+              matchSync.invalidate();
+              if (f.isPlayer) {
+                hudSyncAccum = 1; crayonAudio.playWeaponPickup();
+                if (!wasReloading && f.reloadRemaining > 0) { playerReloadSoundPending = true; crayonAudio.playGunReload(); }
+              }
+              spawnStylizedHitEffect(pickup.x, pickup.y + .5, pickup.z, '#F3C875');
+              break;
             }
           }
 
@@ -3513,6 +3495,14 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                 }
               }
 
+              let nearestAmmo: MedkitPickup | null = null, nearestAmmoDist = 30;
+              if (f.weaponType === 'assault' && f.ammo + f.reserveAmmo <= 30) {
+                for (const pickup of ammoPickups) {
+                  const distance = Math.hypot(pickup.x - f.x, pickup.z - f.z);
+                  if (pickup.active && distance < nearestAmmoDist) { nearestAmmo = pickup; nearestAmmoDist = distance; }
+                }
+              }
+
               // Check if AI should grab a nearby Power Weapon
               let nearestWeapon: WeaponPickup | null = null;
               let nearestWeaponDist = 14.5;
@@ -3551,6 +3541,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                 if (nearestMedkit.y > f.y + 0.5 && nearestMedDist < 5.0 && f.grounded) {
                   wantsJump = true;
                 }
+              } else if (nearestAmmo) {
+                const dx = nearestAmmo.x - f.x, dz = nearestAmmo.z - f.z, length = Math.max(.01, Math.hypot(dx, dz));
+                moveX = dx / length; moveZ = dz / length;
               } else if (nearestWeapon && (nearestWeaponDist < 8.5 || !inSight)) {
                 const wdx = nearestWeapon.x - f.x;
                 const wdz = nearestWeapon.z - f.z;
@@ -3944,7 +3937,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                   damagePulse = 1;
                   const attacker = fighters.find(f => f.id === b.ownerId);
                   damageAngle = Math.atan2((attacker?.x ?? b.x) - target.x, target.z - (attacker?.z ?? b.z)) * 180 / Math.PI;
-                  if (enableShakeRef.current) screenShakeMag = Math.max(screenShakeMag, 0.16);
+                  if (enableShakeRef.current) screenShakeMag = Math.max(screenShakeMag, 0.08);
                 }
                 target.hitFlashTimer = 0.22;
                 target.timeSinceLastHit = 0;
@@ -4005,7 +3998,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
           b.mesh.position.set(b.x, b.y, b.z);
           if (b.weaponType === 'fire') {
             const fireProgress = 1 - Math.max(0, b.life / b.maxLife);
-            b.mesh.scale.setScalar(1 + fireProgress * 1.45);
+            b.mesh.scale.setScalar(1 + fireProgress * .65);
             b.mesh.rotation.x += dt * 12;
             b.mesh.rotation.y += dt * 14;
           }
@@ -4030,7 +4023,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
 
         if (p.kind === 'ring') {
           const s = 1 + progress * 4.2;
-          p.mesh.scale.set(s, s, 1);
+          p.mesh.scale.setScalar(s);
           const m = (p.mesh as THREE.Mesh).material as THREE.MeshBasicMaterial;
           m.opacity = Math.max(0, 1 - progress);
         } else if (p.kind === 'pillar') {
@@ -4090,21 +4083,6 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
         }
       }
 
-      // Particle bursts share materials. Dispose only after every particle using one expires.
-      if (pendingMaterials.size) {
-        const activeMaterials = new Set<THREE.Material>();
-        for (const object of [...bullets.map(b => b.mesh), ...vfxParticles.map(p => p.mesh)]) {
-          object.traverse(child => {
-            if (child instanceof THREE.Mesh) {
-              for (const material of Array.isArray(child.material) ? child.material : [child.material]) activeMaterials.add(material);
-            }
-          });
-        }
-        for (const material of pendingMaterials) {
-          if (!activeMaterials.has(material)) { material.dispose(); pendingMaterials.delete(material); }
-        }
-      }
-
       // Camera Tracking (Defaults to Follow Camera)
       if (screenShakeMag > 0) {
         screenShakeMag = Math.max(0, screenShakeMag - dt * 2.2);
@@ -4121,9 +4099,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       const lookY = playerFighter.visualY + 1.3;
       const lookZ = playerFighter.z - 2.2 - portraitFactor * 0.6;
 
-      camera.position.x += (camTargetX + shakeX - camera.position.x) * Math.min(1, dt * 8);
-      camera.position.y += (camTargetY + shakeY - camera.position.y) * Math.min(1, dt * 8);
-      camera.position.z += (camTargetZ - camera.position.z) * Math.min(1, dt * 8);
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, camTargetX + shakeX, 10, rawDt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, camTargetY + shakeY, 10, rawDt);
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, camTargetZ, 10, rawDt);
       camera.lookAt(lookX, lookY, lookZ);
       for (const fighter of fighters) updateOverheadHealth(fighter.hpBarBg, fighter.hpBarFill, camera, fighter.hp, fighter.maxHp,
         hitHealthVisible(fighter.hp, fighter.timeSinceLastHit, fighter.respawnTimer <= 0));
@@ -4133,9 +4111,9 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       hudSyncAccum += rawDt;
       bloodFeedback.update(dt);
       ragdolls.update(dt);
-      const visibleHudKey = `${Math.ceil(countdownSec)}:${Math.ceil(Math.max(0, effectiveMatchDurationSec - matchElapsedSec))}:${Math.round(playerFighter.hp)}:${playerFighter.maxHp}:${playerFighter.kills}:${playerFighter.deaths}:${Math.ceil(playerFighter.respawnTimer)}:${playerFighter.weaponType}:${playerFighter.ammo}:${Math.ceil(playerFighter.reloadRemaining * 10)}:${fighters.map(f => `${f.kills},${f.deaths}`).join(';')}`;
-      if (hudSyncAccum >= 0.1 && visibleHudKey !== lastVisibleHudKey) {
-        hudSyncAccum = 0;
+      const visibleHudKey = hudSyncAccum >= .1 ? `${Math.ceil(countdownSec)}:${Math.ceil(Math.max(0, effectiveMatchDurationSec - matchElapsedSec))}:${Math.round(playerFighter.hp)}:${playerFighter.maxHp}:${playerFighter.kills}:${playerFighter.deaths}:${Math.ceil(playerFighter.respawnTimer)}:${playerFighter.weaponType}:${playerFighter.ammo}:${playerFighter.reserveAmmo}:${Math.ceil(playerFighter.weaponTimer)}:${Math.ceil(playerFighter.reloadRemaining * 10)}:${fighters.map(f => `${f.kills},${f.deaths}`).join(';')}` : lastVisibleHudKey;
+      if (hudSyncAccum >= .1) hudSyncAccum = 0;
+      if (visibleHudKey !== lastVisibleHudKey) {
         lastVisibleHudKey = visibleHudKey;
         const sortedStandings = [...fighters]
           .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)
@@ -4181,6 +4159,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
                 : 'ASSAULT',
           weaponTimerSec: playerFighter.weaponTimer,
           ammo: playerFighter.ammo,
+          reserveAmmo: playerFighter.reserveAmmo,
           magazineSize: GUN_WEAPONS[playerFighter.weaponType].magazine,
           reloadRemaining: playerFighter.reloadRemaining,
           reloadDuration: GUN_WEAPONS[playerFighter.weaponType].reloadSec,
@@ -4224,8 +4203,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       document.removeEventListener('visibilitychange', onInputVisibility);
       resetInput();
       window.removeEventListener('resize', handleResize);
-      for (const effect of [...bullets.map(b => b.mesh), ...vfxParticles.map(p => p.mesh)]) releaseEffect(effect);
-      for (const material of pendingMaterials) material.dispose();
+      combatVisuals.dispose();
       bloodFeedback.dispose();
       ragdolls.dispose();
       weather.dispose();

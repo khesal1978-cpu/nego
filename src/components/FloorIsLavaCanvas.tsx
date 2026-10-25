@@ -27,6 +27,8 @@ import { characterSceneKey } from '../three/characterSceneKey';
 import { createNukeHealthKits, updateNukeHealthKits, collectNukeHealthKit, NUKE_KIT_SPOTS } from './nukeHealthKits';
 import { createFortCoastShape, createFortSurfGeometry, createFortHills, createFortSurfaceTexture, applyFortMasonryScale } from '../three/gunFightEnvironment';
 import React, { useEffect, useRef } from 'react';
+import { createCombatVisualPool, createImpactGate } from '../three/combatVisualPool';
+import { createMotionTrail } from '../three/motionTrail';
 import * as THREE from 'three';
 import {
   AIDifficulty,
@@ -140,7 +142,7 @@ interface DodgeballObject {
   floorRing: THREE.Mesh;
   beaconArrow: THREE.Mesh;
   trailMeshes: THREE.Mesh[];
-  trailHistory: Array<{ x: number; y: number; z: number }>;
+  motionTrail: ReturnType<typeof createMotionTrail>;
   state: 'free' | 'held' | 'thrown';
   holderId: string | null;
   targetId: string | null;
@@ -972,7 +974,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
       scene.add(beaconArrow);
 
       const trailMeshes: THREE.Mesh[] = [];
-      const trailHistory: Array<{ x: number; y: number; z: number }> = [];
+      const motionTrail = createMotionTrail(TRAIL_LEN);
+      motionTrail.reset(bCfg.homeX, 0.54, bCfg.homeZ);
       for (let t = 0; t < TRAIL_LEN; t++) {
         const tm = new THREE.Mesh(
           new THREE.SphereGeometry(0.32 * (1 - t / TRAIL_LEN), 8, 6),
@@ -985,7 +988,6 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         tm.visible = false;
         scene.add(tm);
         trailMeshes.push(tm);
-        trailHistory.push({ x: bCfg.homeX, y: 0.54, z: bCfg.homeZ });
       }
 
       scene.add(ballGrp);
@@ -997,7 +999,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         floorRing,
         beaconArrow,
         trailMeshes,
-        trailHistory,
+        motionTrail,
         state: 'free',
         holderId: null,
         targetId: null,
@@ -1273,6 +1275,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
 
     const vfxBursts: VfxBurst[] = [];
     let screenShakeMag = 0;
+    const combatVisuals = createCombatVisualPool();
+    const allowImpact = createImpactGate();
 
     const bloodFeedback = createBloodFeedback(scene);
     const ragdolls = createCharacterRagdolls(scene, () => .02);
@@ -1287,15 +1291,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
       colorHex: string,
       isBig = false
     ) => {
-      const ringGeo = new THREE.RingGeometry(0.24, isBig ? 0.64 : 0.44, 24);
-      ringGeo.rotateX(-Math.PI / 2);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.85,
-      });
-      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      if (!allowImpact(hx, hy, hz, performance.now())) return;
+      const ringMesh = combatVisuals.take(isBig ? 'nuke-big-ring' : 'nuke-ring', colorHex);
       ringMesh.position.set(hx, Math.max(0.05, hy), hz);
       scene.add(ringMesh);
       vfxBursts.push({
@@ -1467,10 +1464,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
       ball.floorRing.visible = false;
       ball.beaconArrow.visible = false;
 
-      for (let t = 0; t < TRAIL_LEN; t++) {
-        ball.trailHistory[t] = { x: ball.x, y: ball.y, z: ball.z };
-        ball.trailMeshes[t].visible = true;
-      }
+      ball.motionTrail.reset(ball.x, ball.y, ball.z);
 
       crayonAudio.playDodgeballThrow(isSuper);
       matchSync.invalidate();
@@ -1650,8 +1644,10 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         }
         for (const state of p.balls) {
           const ball = dodgeballs.find(b => b.id === state.id); if (!ball) continue;
+          const previousState = ball.state;
           applyNumericState(ball, state, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'pickupCooldown']);
           if (['free', 'held', 'thrown'].includes(state.state)) ball.state = state.state;
+          if (newRound || previousState !== ball.state) ball.motionTrail.reset(ball.x, ball.y, ball.z);
           ball.holderId = athletes.find(a => a.slotIndex === state.holderSlot)?.id ?? null;
           ball.isSuperThrow = Boolean(state.isSuperThrow);
         }
@@ -1694,6 +1690,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
           ball.pickupCooldown = 0.28;
           ball.x = evt.payload.x; ball.y = evt.payload.y; ball.z = evt.payload.z;
           ball.vx = evt.payload.vx; ball.vy = evt.payload.vy; ball.vz = evt.payload.vz;
+          ball.motionTrail.reset(ball.x, ball.y, ball.z);
           matchSync.invalidate();
           crayonAudio.playDodgeballThrow(Boolean(evt.payload.isSuper));
         }
@@ -1768,6 +1765,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
         b.floorRing.position.set(b.homeX, 0.042, b.homeZ);
         b.beaconArrow.visible = false;
         b.beaconArrow.position.set(b.homeX, 1.65, b.homeZ);
+        b.motionTrail.reset(b.x, b.y, b.z);
         b.trailMeshes.forEach((tm) => {
           tm.visible = false;
         });
@@ -2423,16 +2421,6 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
           ball.ballSphere.rotation.x += dt * 20;
           ball.ballSphere.rotation.y += dt * 15;
 
-          for (let t = TRAIL_LEN - 1; t > 0; t--) {
-            ball.trailHistory[t] = { ...ball.trailHistory[t - 1] };
-          }
-          ball.trailHistory[0] = { x: ball.x, y: ball.y, z: ball.z };
-          for (let t = 0; t < TRAIL_LEN; t++) {
-            const pt = ball.trailHistory[t];
-            ball.trailMeshes[t].position.set(pt.x, pt.y, pt.z);
-            ball.trailMeshes[t].visible = true;
-          }
-
           let hitOrCaught = false;
           const segDx = ball.x - prevX;
           const segDz = ball.z - prevZ;
@@ -2518,7 +2506,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
               );
 
               if (victim.isPlayer || thrower?.isPlayer) {
-                screenShakeMag = ball.isSuperThrow ? 0.38 : 0.22;
+                screenShakeMag = ball.isSuperThrow ? 0.2 : 0.1;
               }
 
               if (isKo) {
@@ -2667,6 +2655,17 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
           );
           ball.beaconArrow.rotation.y += dt * 3.0;
         }
+
+        const trailActive = ball.state === 'thrown';
+        ball.motionTrail.update(ball.x, ball.y, ball.z, dt, trailActive);
+        for (let t = 0; t < TRAIL_LEN; t++) {
+          const trailMesh = ball.trailMeshes[t];
+          trailMesh.visible = trailActive;
+          if (trailActive) {
+            const point = ball.motionTrail.points[t];
+            trailMesh.position.set(point.x, point.y, point.z);
+          }
+        }
       }
 
       bloodFeedback.update(dt);
@@ -2719,8 +2718,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
           p.mesh.scale.setScalar(Math.max(0.05, 1 - prog));
         }
         if (p.life <= 0) {
-          scene.remove(p.mesh);
-          if (p.mesh instanceof THREE.Mesh) {
+          if (!combatVisuals.release(p.mesh) && p.mesh instanceof THREE.Mesh) {
+            scene.remove(p.mesh);
             p.mesh.geometry.dispose();
             for (const material of Array.isArray(p.mesh.material) ? p.mesh.material : [p.mesh.material]) material.dispose();
           }
@@ -3088,9 +3087,9 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
       roundDeckTex.dispose(); courtDeckTex.dispose();
       deepOceanTex.dispose();
       lagoonTex.dispose();
-      courtDeckTex.dispose();
       crimsonBallTex.dispose();
       bloodFeedback.dispose();
+      combatVisuals.dispose();
       ragdolls.dispose();
       weather.dispose();
       postPipeline.dispose();

@@ -16,6 +16,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:gun": "node scripts/test-gun-fight.mjs",
+    "test:combat-performance": "node scripts/test-combat-performance.mjs",
     "test:graphics-recovery": "node scripts/test-graphics-recovery.mjs",
     "test:multiplayer": "node scripts/test-multiplayer.mjs",
     "test:visual": "node scripts/test-visual-polish.mjs",

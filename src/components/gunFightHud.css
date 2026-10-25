@@ -1,20 +1,16 @@
 .gun-score { display: flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #ffffff26; border-radius: 10px; background: #203039c7; color: #f2f4f2; font: 700 13px 'Plus Jakarta Sans', sans-serif; font-variant-numeric: tabular-nums; }
 .gun-score svg { opacity: .75; }
-.gun-ammo { position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); min-width: 166px; padding: 8px 12px; border: 1px solid #fff9e540; border-radius: 12px; background: #142e40b8; color: #fffcf1; box-shadow: 0 2px 0 #071b3450; pointer-events: none; }
-.gun-ammo-count { display: flex; align-items: center; gap: 7px; font-family: 'Rubik', var(--font-sans); }
-.gun-ammo-count > svg { width: 18px; height: 18px; }
-.gun-ammo-count strong { font-size: 20px; font-variant-numeric: tabular-nums; }
-.gun-ammo-count small { font-size: 11px; font-weight: 600; opacity: .55; }
-.gun-ammo-count > span { margin-left: auto; font-size: 9px; letter-spacing: .08em; font-weight: 800; }
-.gun-ammo-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 15px; font: 600 9px/1.3 var(--font-sans); opacity: .8; }
-.gun-ammo-status > svg { width: 12px; height: 12px; }
-.gun-ammo-status kbd { font: inherit; }
+.gun-ammo { position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px; border: 1px solid #a0e7e535; border-radius: 11px; background: #123748dc; color: #f3f8ed; box-shadow: 0 2px 6px #071b3430; pointer-events: none; font-family: 'Rubik', var(--font-sans); white-space: nowrap; }
+.gun-ammo > svg { width: 34px; height: 20px; flex-shrink: 0; }
+.gun-ammo > strong { font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.gun-ammo small { font-size: 11px; font-weight: 700; color: #9abcc5; }
+.gun-ammo > span { padding-left: 8px; border-left: 1px solid #a0e7e526; font-size: 9px; letter-spacing: .035em; font-weight: 800; }
+.gun-ammo em { font-size: 9px; margin-left: 5px; font-style: normal; color: #ffeaa3; }
 .gun-ammo[data-reloading="true"] { border-color: #ffeaa399; color: #ffeaa3; }
-.gun-ammo[data-reloading="true"] .gun-ammo-status { justify-content: center; }
-.gun-ammo-track { height: 3px; background: #fff9e520; border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.gun-ammo[data-empty="true"] { border-color: #f7ad8199; color: #ffd0a8; }
+.gun-ammo-track { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 2px; background: #fff9e520; border-radius: 2px; overflow: hidden; }
 .gun-ammo-track i { display: block; height: 100%; background: #ffeaa3; transition: width 100ms linear; }
-@media (any-pointer: coarse), (hover: none) { .gun-ammo-status kbd { display: none; } }
-@media (max-height: 300px) { .gun-ammo { padding: 5px 9px; bottom: max(8px, env(safe-area-inset-bottom)); }.gun-ammo-count strong { font-size: 17px; } }
+@media (max-height: 300px) { .gun-ammo { height: 30px; padding: 0 8px; gap: 6px; bottom: max(8px, env(safe-area-inset-bottom)); }.gun-ammo > strong { font-size: 18px; }.gun-ammo > svg { width: 28px; } }
 .gun-score-urgent { color: #f0b6a8; }
 .gun-kill-notice { position: absolute; z-index: 20; left: 50%; top: 64%; padding: 2px 6px; color: #ff4b43; text-shadow: 0 1px 3px #000, 0 0 6px #00000080; font: 400 18px 'Bangers', 'Impact', var(--font-display), sans-serif; letter-spacing: .045em; line-height: 1.2; white-space: nowrap; pointer-events: none; animation: gunKillConfirm 1.5s ease-out forwards; }
 @keyframes gunKillConfirm { 0% { opacity: 0; transform: translate(-50%, 3px) scale(.92); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.06); } 24%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -2px); } }

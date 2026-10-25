@@ -21,7 +21,7 @@ export const GAME_TUTORIALS = {
   gun: { name: 'Gun Fight', goal: 'Score the most eliminations before time runs out.', steps: [
     { title: 'Move into position', gesture: 'drag', controls: ['move'], phone: 'Drag the visible left joystick to move. Find a clear view of a nearby rival.', desktop: 'Move with WASD or arrow keys. Find a clear view of a nearby rival.' },
     { title: 'Aim and fire', gesture: 'tap', controls: ['fire'], phone: 'Keep your rival near the crosshair. Hold the Fire button to shoot, and release to stop.', desktop: 'Keep your rival near the crosshair. Hold F or the left mouse button to shoot.' },
-    { title: 'Refill your magazine', gesture: 'tap', controls: ['reload'], phone: 'Tap Reload to refill early. An empty magazine reloads automatically. You can keep moving, but cannot fire until the reload finishes.', desktop: 'Press R to reload early. An empty magazine reloads automatically. Keep moving into cover until the reload finishes.' },
+    { title: 'Refill your magazine', gesture: 'tap', controls: ['reload'], phone: 'Assault: 30 loaded + 90 spare. Tap Reload, or reload automatically when empty. Collect ammo crates. Shotgun and Fire have unlimited reserve while their timers run.', desktop: 'Assault: 30 loaded + 90 spare. Press R, or reload automatically when empty. Collect ammo crates. Shotgun and Fire have unlimited reserve while their timers run.' },
     { title: 'Keep moving', gesture: 'tap', controls: ['jump'], phone: 'Tap Jump to jump. Use cover while reloading.', desktop: 'Press Space to jump. Use cover while reloading.' },
   ] },
   nuke: { name: 'Nuke', goal: 'Stay alive, dodge incoming balls and win the final duel.', steps: [

@@ -79,3 +79,18 @@ export function createArenaMedkit(): THREE.Group {
   rounded(group, [0.10, 0.019, 0.28], [0, 0.302, 0], green, 0.008);
   return group;
 }
+
+export function createArenaAmmoCrate(): THREE.Group {
+  const group = new THREE.Group(); group.name = 'arena-ammo';
+  const olive = material('#5D7561'), dark = material('#2C484A'), brass = material('#F3C875');
+  rounded(group, [.78, .44, .46], [0, 0, 0], olive, .045);
+  rounded(group, [.82, .07, .50], [0, .24, 0], dark, .02);
+  rounded(group, [.3, .06, .09], [0, .34, 0], dark);
+  for (const x of [-.18, 0, .18]) {
+    rounded(group, [.075, .21, .026], [x, 0, .245], brass, .009);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(.038, .075, 8), brass);
+    tip.position.set(x, .14, .245); group.add(tip);
+  }
+  rounded(group, [.07, .12, .035], [0, .16, -.256], brass);
+  return group;
+}

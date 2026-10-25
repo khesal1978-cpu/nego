@@ -1,12 +1,34 @@
 import { GUN_WEAPONS, type GunWeapon } from './gunFightCombat';
 
-export interface GunMagazine { weaponType: GunWeapon; ammo: number; reloadRemaining: number }
-export function refillGunMagazine(state: GunMagazine) {
+export const ASSAULT_AMMO_CAP = 120;
+export const ASSAULT_PICKUP_ROUNDS = 30;
+export interface GunMagazine {
+  weaponType: GunWeapon; ammo: number; reloadRemaining: number;
+  reserveAmmo: number; assaultAmmo: number;
+}
+/** A fresh life starts with 30 loaded and 90 spare assault rounds. */
+export function resetGunAmmo(state: GunMagazine) {
+  state.assaultAmmo = GUN_WEAPONS.assault.magazine;
+  state.reserveAmmo = ASSAULT_AMMO_CAP - state.assaultAmmo;
   state.ammo = GUN_WEAPONS[state.weaponType].magazine;
   state.reloadRemaining = 0;
 }
+/** Timed power weapons never replenish the saved assault supply. */
+export function equipGunWeapon(state: GunMagazine, weapon: GunWeapon) {
+  if (state.weaponType === 'assault') state.assaultAmmo = state.ammo;
+  state.weaponType = weapon;
+  state.ammo = weapon === 'assault' ? state.assaultAmmo : GUN_WEAPONS[weapon].magazine;
+  state.reloadRemaining = 0;
+  if (state.ammo === 0) startGunReload(state);
+}
+export function collectAssaultAmmo(state: GunMagazine) {
+  const added = Math.max(0, Math.min(ASSAULT_PICKUP_ROUNDS, ASSAULT_AMMO_CAP - state.assaultAmmo - state.reserveAmmo));
+  state.reserveAmmo += added;
+  if (added > 0 && state.weaponType === 'assault' && state.ammo === 0) startGunReload(state);
+  return added;
+}
 export function startGunReload(state: GunMagazine) {
-  if (state.reloadRemaining > 0 || state.ammo >= GUN_WEAPONS[state.weaponType].magazine) return false;
+  if (state.reloadRemaining > 0 || state.ammo >= GUN_WEAPONS[state.weaponType].magazine || (state.weaponType === 'assault' && state.reserveAmmo <= 0)) return false;
   state.reloadRemaining = GUN_WEAPONS[state.weaponType].reloadSec;
   return true;
 }
@@ -15,6 +37,7 @@ export function spendGunRound(state: GunMagazine) {
   if (state.reloadRemaining > 0) return false;
   if (state.ammo <= 0) { startGunReload(state); return false; }
   state.ammo -= 1;
+  if (state.weaponType === 'assault') state.assaultAmmo = state.ammo;
   if (state.ammo === 0) startGunReload(state);
   return true;
 }
@@ -22,12 +45,19 @@ export function stepGunReload(state: GunMagazine, dt: number) {
   if (state.reloadRemaining <= 0 || !Number.isFinite(dt) || dt <= 0) return false;
   state.reloadRemaining = Math.max(0, state.reloadRemaining - dt);
   if (state.reloadRemaining > 1e-8) return false;
-  refillGunMagazine(state);
+  const missing = GUN_WEAPONS[state.weaponType].magazine - state.ammo;
+  const loaded = state.weaponType === 'assault' ? Math.min(missing, state.reserveAmmo) : missing;
+  state.ammo += loaded;
+  state.reloadRemaining = 0;
+  if (state.weaponType === 'assault') { state.reserveAmmo -= loaded; state.assaultAmmo = state.ammo; }
   return true;
 }
 export function applyGunMagazine(state: GunMagazine, snapshot: Record<string, unknown>) {
   const spec = GUN_WEAPONS[state.weaponType];
   if (typeof snapshot.ammo === 'number' && Number.isFinite(snapshot.ammo)) state.ammo = Math.max(0, Math.min(spec.magazine, Math.floor(snapshot.ammo)));
+  if (typeof snapshot.assaultAmmo === 'number' && Number.isFinite(snapshot.assaultAmmo)) state.assaultAmmo = Math.max(0, Math.min(GUN_WEAPONS.assault.magazine, Math.floor(snapshot.assaultAmmo)));
+  if (state.weaponType === 'assault') state.assaultAmmo = state.ammo;
+  if (typeof snapshot.reserveAmmo === 'number' && Number.isFinite(snapshot.reserveAmmo)) state.reserveAmmo = Math.max(0, Math.min(ASSAULT_AMMO_CAP - state.assaultAmmo, Math.floor(snapshot.reserveAmmo)));
   if (typeof snapshot.reloadRemaining === 'number' && Number.isFinite(snapshot.reloadRemaining)) state.reloadRemaining = Math.max(0, Math.min(spec.reloadSec, snapshot.reloadRemaining));
 }
 
