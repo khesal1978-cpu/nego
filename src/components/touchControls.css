@@ -81,16 +81,19 @@
 .touch-stick-knob > span { width: 24%; height: 24%; border: 1px solid #fff9e599; border-radius: 50%; background: #fff9e51a; }
 .touch-control--move[data-held="true"] { background: #fff9e510; border-color: #fff9e5b0; box-shadow: inset 0 0 0 7px #fff9e50d; }
 .touch-control--move[data-held="true"] .touch-stick-knob { border-color: #ffeaa3; background: linear-gradient(145deg, #fff2bb85, #fff2bb45); }
-.touch-editor-preview { position: relative; width: 100%; aspect-ratio: 2.15; min-height: 190px; border: 1px solid #ffffff30; border-radius: 14px; overflow: hidden; background: radial-gradient(ellipse at 50% 55%, #234959, #092436); margin: 14px 0; }
+.touch-editor-preview { position: relative; width: 100%; aspect-ratio: 2.15; border: 1px solid #ffffff30; border-radius: 14px; overflow: hidden; background: radial-gradient(ellipse at 50% 55%, #234959, #092436); margin: 14px 0; }
+.touch-editor-preview-screen { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .touch-editor-reticle { position: absolute; inset: 0; display: grid; place-items: center; color: #ffffff70; font-size: 25px; pointer-events: none; }
-.touch-controls--editing { position: absolute; inset: 4px; display: block; z-index: 1; }
+.touch-controls--editing { position: absolute; inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); display: block; z-index: 1; touch-action: none; }
 .touch-controls--embedded { position: absolute; inset: 6px; display: block; z-index: 1; }
 .touch-controls--full { position: fixed; inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
 .touch-controls--editing .touch-control { cursor: grab; }
-.touch-controls--editing .touch-control[data-held="true"] { cursor: grabbing; }
+.touch-controls--editing .touch-control[data-held="true"] { cursor: grabbing; z-index: 3; }
 .touch-controls--editing .touch-control[data-selected="true"] { outline: 2px solid #ffeaa3; outline-offset: 4px; }
 .touch-controls--editing .touch-control[data-selected="true"] { z-index: 2; background: #345663; border-color: #fff9e5; }
 .touch-editor-buttons { flex-wrap: wrap; }
+.touch-editor-opacity-preview { display: flex; align-items: center; gap: 8px; color: #35545c; font-size: 12px; min-height: 44px; }
+.touch-editor-opacity-preview input { width: 18px; height: 18px; accent-color: #416970; }
 .touch-editor-sliders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; margin: 20px 0; }
 .touch-editor-sliders { padding: 16px; border: 1px solid #d8ded4; border-radius: 12px; background: #fafbf6; }
 .touch-editor-sliders label > span { display: flex; justify-content: space-between; gap: 8px; color: #35545c; font-size: 12px; font-weight: 700; }
@@ -103,31 +106,32 @@
 .touch-editor-active strong { font-size: 13px; }.touch-editor-active small { font-size: 10px; margin-top: 4px; line-height: 1.4; }
 .touch-editor-active .menu-primary { margin-left: auto; flex-shrink: 0; padding: 10px 12px; min-height: 44px; }
 .touch-editor-full { position: fixed; inset: 0; z-index: 240; background: radial-gradient(ellipse at 50% 45%, #345663, #092633); font-family: 'Plus Jakarta Sans', sans-serif; }
-.touch-editor-full-toolbar { position: absolute; z-index: 2; top: max(6px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #fff9e540; border-radius: 12px; background: #092633ee; color: #fff9e5; }
+.touch-editor-full-toolbar { position: absolute; z-index: 2; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; width: max-content; max-width: calc(100% - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right))); padding: 6px 8px; border: 1px solid #fff9e540; border-radius: 12px; background: #092633ee; color: #fff9e5; }
+.touch-editor-full-opacity { display: flex; flex: 1 0 100%; align-items: center; justify-content: center; gap: 10px; border-top: 1px solid #fff9e526; padding-top: 4px; }
+.touch-editor-full-opacity label { display: flex; align-items: center; gap: 6px; min-height: 32px; font-size: 10px; }
+.touch-editor-full-opacity input[type="range"] { width: 100px; min-height: 32px; accent-color: #ffeaa3; }
+.touch-editor-full-opacity input[type="checkbox"] { width: 16px; height: 16px; accent-color: #ffeaa3; }
 .touch-editor-full-toolbar strong, .touch-editor-full-toolbar small { display: block; }.touch-editor-full-toolbar strong { font-size: 12px; }.touch-editor-full-toolbar small { font-size: 9px; opacity: .75; margin-top: 3px; }
 .touch-editor-full-toolbar button { border: 1px solid #fff9e560; border-radius: 8px; background: #284b5b; color: #fff9e5; min-width: 44px; min-height: 44px; padding: 6px 10px; font: 800 13px 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
 .touch-editor-full-toolbar button[data-done] { background: #ffeaa3; color: #173948; }
+.touch-editor-full-toolbar button:disabled { opacity: .4; cursor: default; }
 .touch-editor-full-toolbar button:focus-visible { outline: 2px solid #ffeaa3; outline-offset: 2px; }
 .touch-editor-full-toolbar output { font-size: 11px; font-variant-numeric: tabular-nums; min-width: 32px; }
 .touch-editor-full-toolbar select { max-width: 110px; min-height: 32px; border: 0; border-radius: 6px; background: #284b5b; color: #fff9e5; padding: 4px; font: 800 12px 'Plus Jakarta Sans', sans-serif; }
 @media (max-width: 480px) { .touch-editor-active { flex-wrap: wrap; }.touch-editor-active .menu-primary { width: 100%; }.touch-editor-full-toolbar small { display: none; } }
-@media (max-width: 480px) { .touch-editor-sliders { gap: 14px; }.touch-editor-preview { min-height: 180px; } }
+@media (max-width: 480px) { .touch-editor-sliders { gap: 14px; } }
 @media (max-height: 360px) {
-  .touch-controls:not(.touch-controls--editing) .touch-control { --control-size: clamp(44px, var(--requested-size), 72px); }
-  .touch-controls:not(.touch-controls--editing) .touch-control--move { --control-size: clamp(84px, var(--requested-size), 100px); }
+  .touch-controls .touch-control { --control-size: clamp(44px, var(--requested-size), 72px); }
+  .touch-controls .touch-control--move { --control-size: clamp(84px, var(--requested-size), 100px); }
 }
 @media (max-height: 300px) {
-  .touch-controls:not(.touch-controls--editing) .touch-control { --control-size: clamp(44px, var(--requested-size), 60px); }
-  .touch-controls:not(.touch-controls--editing) .touch-control--move { --control-size: clamp(84px, var(--requested-size), 88px); }
+  .touch-controls .touch-control { --control-size: clamp(44px, var(--requested-size), 60px); }
+  .touch-controls .touch-control--move { --control-size: clamp(84px, var(--requested-size), 88px); }
 }
 @media (max-height: 260px) {
-  .touch-controls:not(.touch-controls--editing) .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 52px); }
+  .touch-controls .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 52px); }
 }
 @media (max-height: 220px) {
-  .touch-controls:not(.touch-controls--editing) .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 48px); }
+  .touch-controls .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 48px); }
 }
-@media (max-height: 360px) { .touch-controls--full .touch-control { --control-size: clamp(44px, var(--requested-size), 72px); }.touch-controls--full .touch-control--move { --control-size: clamp(84px, var(--requested-size), 100px); } }
-@media (max-height: 300px) { .touch-controls--full .touch-control { --control-size: clamp(44px, var(--requested-size), 60px); }.touch-controls--full .touch-control--move { --control-size: clamp(84px, var(--requested-size), 88px); } }
-@media (max-height: 260px) { .touch-controls--full .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 52px); } }
-@media (max-height: 220px) { .touch-controls--full .touch-control:not(.touch-control--move) { --control-size: clamp(44px, var(--requested-size), 48px); } }
 @media (prefers-reduced-motion: reduce) { .touch-control { transition: none; } }

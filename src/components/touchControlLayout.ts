@@ -21,6 +21,16 @@ export const DEFAULT_TOUCH_LAYOUTS: TouchLayouts = {
   volleyball: { move: button(14, 76, 110, .6), spike: button(88, 56, 78, .8), dive: button(77, 82, 56), lift: button(77, 38, 52), super: button(92, 29, 52) },
 };
 const bound = (value: unknown, fallback: number, min: number, max: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+/** Match the gameplay CSS limits so editing never offers sizes the screen clamps away. */
+export function touchControlSizeLimits(action: TouchAction, height: number) {
+  const move = action === 'move';
+  let max = move ? 160 : 100;
+  if (height <= 360) max = move ? 100 : 72;
+  if (height <= 300) max = move ? 88 : 60;
+  if (!move && height <= 260) max = 52;
+  if (!move && height <= 220) max = 48;
+  return { min: move ? 84 : 44, max };
+}
 export function normalizeTouchLayouts(input: unknown): TouchLayouts {
   const result = structuredClone(DEFAULT_TOUCH_LAYOUTS);
   if (!input || typeof input !== 'object') return result;

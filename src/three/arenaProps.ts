@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { getToonGradientMap } from './crayonMaterials';
+import { batchStaticScenery } from './scenePerformance';
 
 function material(color: string) { return new THREE.MeshToonMaterial({ color, gradientMap: getToonGradientMap() }); }
 
@@ -80,17 +81,40 @@ export function createArenaMedkit(): THREE.Group {
   return group;
 }
 
-export function createArenaAmmoCrate(): THREE.Group {
+export function createArenaAmmoPickup(): THREE.Group {
   const group = new THREE.Group(); group.name = 'arena-ammo';
-  const olive = material('#5D7561'), dark = material('#2C484A'), brass = material('#F3C875');
-  rounded(group, [.78, .44, .46], [0, 0, 0], olive, .045);
-  rounded(group, [.82, .07, .50], [0, .24, 0], dark, .02);
-  rounded(group, [.3, .06, .09], [0, .34, 0], dark);
-  for (const x of [-.18, 0, .18]) {
-    rounded(group, [.075, .21, .026], [x, 0, .245], brass, .009);
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(.038, .075, 8), brass);
-    tip.position.set(x, .14, .245); group.add(tip);
+  const brass = material('#ECC775'), copper = material('#C88C56'), primer = material('#947045');
+  // Four exposed rifle cartridges, with a base rim, shoulder and tapered copper tip.
+  const casing = new THREE.LatheGeometry([
+    new THREE.Vector2(0, -.24), new THREE.Vector2(.077, -.24),
+    new THREE.Vector2(.077, -.214), new THREE.Vector2(.064, -.214),
+    new THREE.Vector2(.064, -.196), new THREE.Vector2(.069, -.19),
+    new THREE.Vector2(.069, .058), new THREE.Vector2(.045, .107),
+    new THREE.Vector2(.045, .17), new THREE.Vector2(0, .17),
+  ], 10);
+  const tip = new THREE.LatheGeometry([
+    new THREE.Vector2(0, 0), new THREE.Vector2(.046, 0),
+    new THREE.Vector2(.045, .033), new THREE.Vector2(.03, .092),
+    new THREE.Vector2(.015, .126), new THREE.Vector2(0, .145),
+  ], 10);
+  const base = new THREE.CylinderGeometry(.026, .026, .004, 8);
+  for (const x of [-.27, -.09, .09, .27]) {
+    const cartridge = new THREE.Group();
+    cartridge.position.set(x, Math.abs(x) * .08, 0);
+    cartridge.rotation.set(.12, 0, -x * .4); group.add(cartridge);
+    const shell = new THREE.Mesh(casing, brass);
+    const point = new THREE.Mesh(tip, copper); point.position.y = .17;
+    const cap = new THREE.Mesh(base, primer); cap.position.y = -.242;
+    shell.castShadow = point.castShadow = cap.castShadow = true;
+    cartridge.add(shell, point, cap);
   }
-  rounded(group, [.07, .12, .035], [0, .16, -.256], brass);
+
+  // Three material batches keep the pickup light while the group bobs and rotates.
+  const sourceGeometry = new Set<THREE.BufferGeometry>();
+  group.traverse(object => { if (object instanceof THREE.Mesh) sourceGeometry.add(object.geometry); });
+  batchStaticScenery(group);
+  group.traverse(object => { if (object instanceof THREE.Mesh) sourceGeometry.delete(object.geometry); });
+  sourceGeometry.forEach(geometry => geometry.dispose());
+  for (const child of [...group.children]) if (child instanceof THREE.Group && !child.children.length) group.remove(child);
   return group;
 }

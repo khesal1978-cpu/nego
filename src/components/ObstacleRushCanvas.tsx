@@ -48,7 +48,7 @@ import {
   setLiveRushMapThumbnail,
 } from '../three/crayonModels';
 import { crayonAudio } from '../audio/crayonAudio';
-import { createArenaWeapon, createArenaMedkit, createArenaAmmoCrate } from '../three/arenaProps';
+import { createArenaWeapon, createArenaMedkit, createArenaAmmoPickup } from '../three/arenaProps';
 import { createFortRoofGeometry, createFortSurfaceTexture, applyFortMasonryScale, createFortCoastShape, createFortHills, createFortSurfGeometry, getFortLandscapeHeight } from '../three/gunFightEnvironment';
 import { CustomSlotInfo, multiplayerClient } from '../network/multiplayerClient';
 import { damageAtDistance, GUN_WEAPONS, segmentBoxHit, segmentCylinderHit } from './gunFightCombat';
@@ -1741,7 +1741,7 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
     createRandomMedkitSlot((firstMedIdx + 3) % MEDKIT_CANDIDATE_SPOTS.length, false, 11.0);
 
     const ammoPickups: MedkitPickup[] = createGunAmmoPickups().map(pickup => {
-      const mesh = createArenaAmmoCrate(); mesh.position.set(pickup.x, pickup.y + .5, pickup.z);
+      const mesh = createArenaAmmoPickup(); mesh.position.set(pickup.x, pickup.y + .5, pickup.z);
       const ringMesh = new THREE.Mesh(new THREE.RingGeometry(.5, .59, 24), new THREE.MeshBasicMaterial({ color: '#F3C875', side: THREE.DoubleSide, transparent: true, opacity: .8 }));
       ringMesh.rotation.x = -Math.PI / 2; ringMesh.position.set(pickup.x, pickup.y + .04, pickup.z);
       mesh.visible = ringMesh.visible = pickup.active;
