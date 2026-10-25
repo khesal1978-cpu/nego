@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Crosshair, Hand, MoveDown, MoveUp, Shield, Volleyball, Zap } from 'lucide-react';
+import { TouchControlIcon } from './TouchControlIcon';
 import { DEFAULT_TOUCH_LAYOUTS, normalizeTouchLayouts, touchJoystick, type ControlFamily, type TouchAction, type TouchButton, type TouchGameActions, type TouchLayouts } from './touchControlLayout';
 import './touchControls.css';
 
 const labels: Record<TouchAction, string> = { move: 'Move', fire: 'Fire', jump: 'Jump', throw: 'Throw', dodge: 'Dodge', spike: 'Hit / Jump', dive: 'Dive', lift: 'Set', super: 'Power' };
-const icons = { fire: Crosshair, jump: ArrowUp, throw: Volleyball, dodge: Shield, spike: MoveUp, dive: MoveDown, lift: Hand, super: Zap };
+const shortLabels = { ...labels, spike: 'Hit' };
 const pressAction = (actions: TouchGameActions, action: TouchAction) => {
   if (action === 'fire') { actions.fireRequested = true; actions.firingHeld = true; }
   if (action === 'jump') actions.jumpRequested = true;
@@ -53,9 +53,8 @@ export function TouchControls({ family, layouts, actions, editing, selected, onS
   };
   return <div ref={root} className={`touch-controls${editing ? ' touch-controls--editing' : ''}`} role="group" aria-label={`${family} mobile controls`}>
     {(Object.entries(layouts[family]) as [TouchAction, TouchButton][]).map(([action, layout]) => {
-      const Icon = action === 'move' ? undefined : icons[action];
       return <button key={action} type="button" className={`touch-control touch-control--${action}`} aria-label={labels[action]}
-        data-selected={editing && selected === action} style={{ '--control-size': `${layout.size * (editing ? .7 : 1)}px`, '--control-opacity': editing ? Math.max(.5, layout.opacity) : layout.opacity, left: `clamp(calc(var(--control-size) / 2 + 4px), ${layout.x}%, calc(100% - var(--control-size) / 2 - 4px))`, top: `clamp(calc(var(--control-size) / 2 + 4px), ${layout.y}%, calc(100% - var(--control-size) / 2 - 4px))` } as React.CSSProperties}
+        data-selected={editing && selected === action} style={{ '--requested-size': `${layout.size * (editing ? .7 : 1)}px`, '--control-opacity': editing ? Math.max(.5, layout.opacity) : layout.opacity, left: `clamp(calc(var(--control-size) / 2 + 4px), ${layout.x}%, calc(100% - var(--control-size) / 2 - 4px))`, top: `clamp(calc(var(--control-size) / 2 + 4px), ${layout.y}%, calc(100% - var(--control-size) / 2 - 4px))` } as React.CSSProperties}
         onPointerDown={event => {
           event.stopPropagation(); event.preventDefault();
           if ([...active.current.values()].some(pointer => pointer.action === action)) return;
@@ -81,7 +80,10 @@ export function TouchControls({ family, layouts, actions, editing, selected, onS
           }
         }} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
         onClick={event => { event.stopPropagation(); if (event.detail !== 0) return; if (editing) onSelect?.(action); else if (actions && action !== 'move') { pressAction(actions.current, action); actions.current.firingHeld = false; } }}>
-        {action === 'move' ? <><span className="touch-stick-guides" aria-hidden="true">＋</span><span ref={moveKnob} className="touch-stick-knob" /><small>MOVE</small></> : <>{Icon && <Icon aria-hidden="true" />}<small>{labels[action]}</small></>}
+        {action === 'move' ? <>
+          <svg className="touch-stick-guides" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true"><path d="m50 8-5 7h10ZM92 50l-7-5v10ZM50 92l5-7H45ZM8 50l7 5V45Z" /></svg>
+          <span ref={moveKnob} className="touch-stick-knob"><span /></span>
+        </> : <><TouchControlIcon action={action} /><small>{shortLabels[action]}</small></>}
       </button>;
     })}
   </div>;

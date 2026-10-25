@@ -9,11 +9,16 @@ export interface TouchGameActions {
   throwRequested?: boolean; dodgeRequested?: boolean;
   joystickX?: number; joystickY?: number; joystickActive?: boolean;
 }
-const button = (x: number, y: number, size = 62, opacity = .6): TouchButton => ({ x, y, size, opacity });
+const button = (x: number, y: number, size = 62, opacity = .7): TouchButton => ({ x, y, size, opacity });
+const LEGACY_TOUCH_LAYOUTS: TouchLayouts = {
+  gun: { move: button(14, 76, 112, .6), fire: button(86, 69, 74, .6), jump: button(94, 43, 54, .6) },
+  nuke: { move: button(14, 76, 112, .6), throw: button(84, 65, 70, .6), dodge: button(94, 81, 60, .6), jump: button(94, 43, 54, .6) },
+  volleyball: { move: button(14, 76, 112, .6), spike: button(88, 65, 72, .6), dive: button(77, 83, 56, .6), lift: button(95, 42, 54, .6), super: button(78, 43, 54, .6) },
+};
 export const DEFAULT_TOUCH_LAYOUTS: TouchLayouts = {
-  gun: { move: button(14, 76, 112), fire: button(86, 69, 74), jump: button(94, 43, 54) },
-  nuke: { move: button(14, 76, 112), throw: button(84, 65, 70), dodge: button(94, 81, 60), jump: button(94, 43, 54) },
-  volleyball: { move: button(14, 76, 112), spike: button(88, 65, 72), dive: button(77, 83, 56), lift: button(95, 42, 54), super: button(78, 43, 54) },
+  gun: { move: button(14, 76, 110, .6), fire: button(88, 56, 78, .8), jump: button(92, 83, 58) },
+  nuke: { move: button(14, 76, 110, .6), throw: button(88, 56, 78, .8), dodge: button(77, 82, 56), jump: button(92, 83, 58) },
+  volleyball: { move: button(14, 76, 110, .6), spike: button(88, 56, 78, .8), dive: button(77, 82, 56), lift: button(77, 38, 52), super: button(92, 29, 52) },
 };
 const bound = (value: unknown, fallback: number, min: number, max: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 export function normalizeTouchLayouts(input: unknown): TouchLayouts {
@@ -35,11 +40,25 @@ export function normalizeTouchLayouts(input: unknown): TouchLayouts {
   return result;
 }
 export function readTouchLayouts() {
-  try { return normalizeTouchLayouts(JSON.parse(localStorage.getItem('bonkup-touch-layouts-v1') || 'null')); }
+  try {
+    const current = localStorage.getItem('bonkup-touch-layouts-v2');
+    if (current) return normalizeTouchLayouts(JSON.parse(current));
+    const saved = JSON.parse(localStorage.getItem('bonkup-touch-layouts-v1') || 'null');
+    const migrated = normalizeTouchLayouts(saved);
+    // Old builds saved defaults too. Refresh untouched families, keeping custom layouts intact.
+    for (const family of Object.keys(migrated) as ControlFamily[]) {
+      const legacy = LEGACY_TOUCH_LAYOUTS[family];
+      if (saved?.[family] && Object.entries(legacy).every(([action, layout]) =>
+        (Object.keys(layout) as (keyof TouchButton)[]).every(key => saved[family][action]?.[key] === layout[key]))) {
+        migrated[family] = structuredClone(DEFAULT_TOUCH_LAYOUTS[family]);
+      }
+    }
+    return migrated;
+  }
   catch { return normalizeTouchLayouts(null); }
 }
 export function saveTouchLayouts(layouts: TouchLayouts) {
-  try { localStorage.setItem('bonkup-touch-layouts-v1', JSON.stringify(normalizeTouchLayouts(layouts))); } catch { /* Layouts still work in this session. */ }
+  try { localStorage.setItem('bonkup-touch-layouts-v2', JSON.stringify(normalizeTouchLayouts(layouts))); } catch { /* Layouts still work in this session. */ }
 }
 export function touchJoystick(dx: number, dy: number, radius: number) {
   const distance = Math.hypot(dx, dy), scale = distance > radius ? radius / distance : 1;

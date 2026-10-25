@@ -22,8 +22,26 @@ layouts.gun.fire = { x: 76, y: 59, size: 85, opacity: .45 };
 m.saveTouchLayouts(layouts);
 assert.equal(JSON.stringify(m.readTouchLayouts()), JSON.stringify(layouts), 'All per-mode custom controls survive reopening');
 const bad = m.normalizeTouchLayouts({ gun: { fire: { x: 500, y: -99, size: 1000, opacity: NaN }, move: null }, nuke: null });
-assert.equal(bad.gun.fire.x, 95); assert.equal(bad.gun.fire.y, 15); assert.equal(bad.gun.fire.size, 100); assert.equal(bad.gun.fire.opacity, .6);
-assert(bad.nuke.dodge); saved.set('bonkup-touch-layouts-v1', '{broken'); assert(m.readTouchLayouts().volleyball.spike);
+assert.equal(bad.gun.fire.x, 95); assert.equal(bad.gun.fire.y, 15); assert.equal(bad.gun.fire.size, 100); assert.equal(bad.gun.fire.opacity, m.DEFAULT_TOUCH_LAYOUTS.gun.fire.opacity);
+assert(bad.nuke.dodge);
+saved.set('bonkup-touch-layouts-v2', '{broken'); assert(m.readTouchLayouts().volleyball.spike);
+saved.clear();
+const legacyButton = (x, y, size) => ({ x, y, size, opacity: .6 });
+const legacy = {
+  gun: { move: legacyButton(14, 76, 112), fire: legacyButton(86, 69, 74), jump: legacyButton(94, 43, 54) },
+  nuke: { move: legacyButton(14, 76, 112), throw: legacyButton(84, 65, 70), dodge: legacyButton(94, 81, 60), jump: legacyButton(94, 43, 54) },
+  volleyball: { move: legacyButton(14, 76, 112), spike: legacyButton(88, 65, 72), dive: legacyButton(77, 83, 56), lift: legacyButton(95, 42, 54), super: legacyButton(78, 43, 54) },
+};
+saved.set('bonkup-touch-layouts-v1', JSON.stringify(legacy));
+assert.equal(JSON.stringify(m.readTouchLayouts()), JSON.stringify(m.DEFAULT_TOUCH_LAYOUTS), 'Saved old defaults get the updated thumb layout');
+legacy.nuke.jump.x = 70;
+saved.set('bonkup-touch-layouts-v1', JSON.stringify(legacy));
+const migrated = m.readTouchLayouts();
+assert.equal(JSON.stringify(migrated.nuke), JSON.stringify(legacy.nuke), 'A customized family keeps every saved position, size and opacity');
+assert.equal(JSON.stringify(migrated.gun), JSON.stringify(m.DEFAULT_TOUCH_LAYOUTS.gun), 'Untouched families still migrate');
+m.saveTouchLayouts(migrated);
+assert.equal(JSON.stringify(m.readTouchLayouts()), JSON.stringify(migrated), 'Migrated custom controls survive the next reload');
+saved.clear(); saved.set('bonkup-touch-layouts-v1', '{broken'); assert(m.readTouchLayouts().volleyball.spike);
 const a = { current: { spikeRequested: false, diveRequested: false, superRequested: false } };
 function render(family, extra = {}) { index = 0; const tree = m.TouchControls({ family, layouts, actions: a, ...extra }); effects.splice(0).forEach(effect => effect()); return tree; }
 let tree = render('gun');
