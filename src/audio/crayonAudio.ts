@@ -161,6 +161,7 @@ class CrayonAudioEngine {
 
   public syncBackgroundMusic() {
     if (!this.ctx) return; // Starts only after the existing user-gesture audio unlock.
+    if (!this.menuMusic && !this.musicWanted) return;
     this.menuMusic ??= createMenuMusic(this.ctx);
     this.menuMusic.set(this.musicWanted && !this.muted && !(typeof document !== 'undefined' && document.hidden), this.musicVolume);
   }

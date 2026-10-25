@@ -53,7 +53,9 @@ import { createMatchClock, recordRally, gunStandings, nukeStandings } from './co
 import { WeatherControl } from './components/WeatherControl';
 import { CharacterPortrait as ChibiCharacterPortrait } from './components/CharacterPortrait';
 import { customCharacter } from './network/customCharacters';
-import { createGunTouchActions } from './components/gunTouchControls';
+import { TouchControls, TouchControlsEditor } from './components/TouchControls';
+import { readTouchLayouts, saveTouchLayouts, type TouchGameActions } from './components/touchControlLayout';
+import { activeMatchRoom, nextRandomMap } from './components/matchSession';
 import { CharacterStudio } from './components/CharacterStudio';
 import { CustomLobby } from './components/CustomLobby';
 import { GameSettings, ModesAndMaps, type SettingsValues } from './components/GameMenus';
@@ -527,6 +529,9 @@ const BallSkinSwatchIcon: React.FC<{
 export function App() {
   const [savedPreferences] = useState(readPlayerPreferences);
   const [gameState, setGameState] = useState<GameState>('TITLE_MENU');
+  const gameStateRef = useRef(gameState); gameStateRef.current = gameState;
+  const [touchLayouts, setTouchLayouts] = useState(readTouchLayouts);
+  useEffect(() => saveTouchLayouts(touchLayouts), [touchLayouts]);
   const [gameMode, setGameMode] = useState<GameMode>(savedPreferences.gameMode);
   const [learnedControls, setLearnedControls] = useState(readTutorialSeen);
   const [replayControls, setReplayControls] = useState(false);
@@ -653,6 +658,7 @@ export function App() {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [mpRoom, setMpRoom] = useState<CustomRoomInfo | null>(multiplayerClient.currentRoom);
   const [customMatchRoom, setCustomMatchRoom] = useState<CustomRoomInfo | null>(null);
+  const customMatchRoomRef = useRef(customMatchRoom); customMatchRoomRef.current = customMatchRoom;
   const [leavingResultRoom, setLeavingResultRoom] = useState(false);
   const [mpPublicRooms, setMpPublicRooms] = useState<PublicRoomSummary[]>(
     multiplayerClient.publicRooms
@@ -715,139 +721,19 @@ export function App() {
     crayonAudio.syncVolleyballNatureAmbienceVolume();
   }, [muted, musicVol, sfxVol]);
 
-  const actionTriggerRef = useRef<{
-    spikeRequested: boolean;
-    diveRequested: boolean;
-    superRequested: boolean;
-    liftRequested?: boolean;
-    jumpRequested?: boolean;
-    firingHeld?: boolean;
-    fireRequested?: boolean;
-    joystickX?: number;
-    joystickY?: number;
-    joystickActive?: boolean;
-  }>({
-    spikeRequested: false,
-    diveRequested: false,
-    superRequested: false,
-    liftRequested: false,
-    jumpRequested: false,
-    joystickX: 0,
-    joystickY: 0,
-    joystickActive: false,
+  const actionTriggerRef = useRef<TouchGameActions>({
+    spikeRequested: false, diveRequested: false, superRequested: false,
+    joystickX: 0, joystickY: 0, joystickActive: false,
   });
-
-  // Gun Fight: left movement, automatic fire and right-side double-tap jump.
-  const invisibleJoyRef = useRef<{
-    active: boolean;
-    pointerId: number | null;
-    originX: number;
-    originY: number;
-  }>({
-    active: false,
-    pointerId: null,
-    originX: 0,
-    originY: 0,
-  });
-
-  const gunTouchActions = useRef(createGunTouchActions(() => { actionTriggerRef.current.jumpRequested = true; }));
-
-  const joyContainerRef = useRef<HTMLDivElement | null>(null);
-  const joyKnobRef = useRef<HTMLDivElement | null>(null);
-
-  const resetInvisibleJoy = useCallback(() => {
-    invisibleJoyRef.current.active = false;
-    invisibleJoyRef.current.pointerId = null;
-    gunTouchActions.current.reset();
+  const resetTouchActions = useCallback(() => {
     Object.assign(actionTriggerRef.current, {
       joystickActive: false, joystickX: 0, joystickY: 0,
       spikeRequested: false, diveRequested: false, superRequested: false,
       liftRequested: false, jumpRequested: false, firingHeld: false, fireRequested: false,
+      throwRequested: false, dodgeRequested: false,
     });
-    if (joyContainerRef.current) joyContainerRef.current.style.display = 'none';
   }, []);
-  useEffect(() => {
-    if (isPortrait || gameState !== 'PLAYING') resetInvisibleJoy();
-  }, [isPortrait, gameState, resetInvisibleJoy]);
-  useEffect(() => {
-    const onVisibility = () => { if (document.hidden) resetInvisibleJoy(); };
-    window.addEventListener('blur', resetInvisibleJoy);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('blur', resetInvisibleJoy);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [resetInvisibleJoy]);
-
-  const handleInvisibleJoyDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const bounds = e.currentTarget.getBoundingClientRect();
-    if (e.pointerType === 'mouse' || e.clientX - bounds.left >= bounds.width / 2) {
-      if (!gunTouchActions.current.start(e)) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      return;
-    }
-    // Only capture and start joystick if no finger is currently controlling the joystick!
-    if (!invisibleJoyRef.current.active || invisibleJoyRef.current.pointerId === null) {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      invisibleJoyRef.current.active = true;
-      invisibleJoyRef.current.pointerId = e.pointerId;
-      invisibleJoyRef.current.originX = e.clientX;
-      invisibleJoyRef.current.originY = e.clientY;
-      actionTriggerRef.current.joystickX = 0;
-      actionTriggerRef.current.joystickY = 0;
-      actionTriggerRef.current.joystickActive = true;
-      if (joyContainerRef.current && joyKnobRef.current) {
-        joyContainerRef.current.style.display = 'flex';
-        joyContainerRef.current.style.left = `${e.clientX}px`;
-        joyContainerRef.current.style.top = `${e.clientY}px`;
-        joyKnobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
-      }
-    }
-  }, []);
-
-  const handleInvisibleJoyMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    gunTouchActions.current.move(e);
-    if (!invisibleJoyRef.current.active || invisibleJoyRef.current.pointerId !== e.pointerId) {
-      return;
-    }
-    const maxR = 58;
-    const dx = e.clientX - invisibleJoyRef.current.originX;
-    const dy = e.clientY - invisibleJoyRef.current.originY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 5) {
-      actionTriggerRef.current.joystickX = 0;
-      actionTriggerRef.current.joystickY = 0;
-      if (joyKnobRef.current) {
-        joyKnobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
-      }
-      return;
-    }
-    const clamped = Math.min(dist, maxR);
-    const angle = Math.atan2(dy, dx);
-    const clampedDx = Math.cos(angle) * clamped;
-    const clampedDy = Math.sin(angle) * clamped;
-    actionTriggerRef.current.joystickX = clampedDx / maxR;
-    actionTriggerRef.current.joystickY = clampedDy / maxR;
-    actionTriggerRef.current.joystickActive = true;
-    if (joyKnobRef.current) {
-      joyKnobRef.current.style.transform = `translate3d(${clampedDx}px, ${clampedDy}px, 0)`;
-    }
-  }, []);
-
-  const handleInvisibleJoyEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    gunTouchActions.current.end(e);
-    if (invisibleJoyRef.current.pointerId === e.pointerId) {
-      invisibleJoyRef.current.active = false;
-      invisibleJoyRef.current.pointerId = null;
-      actionTriggerRef.current.joystickX = 0;
-      actionTriggerRef.current.joystickY = 0;
-      actionTriggerRef.current.joystickActive = false;
-      if (joyContainerRef.current) {
-        joyContainerRef.current.style.display = 'none';
-      }
-    }
-  }, []);
-
+  useEffect(() => { if (gameState !== 'PLAYING') resetTouchActions(); }, [gameState, resetTouchActions]);
   const [rushRunKey, setRushRunKey] = useState<number>(1);
   const [callouts, setCallouts] = useState<CalloutPopup[]>([]);
   const calloutTimers = useRef(new Set<number>());
@@ -927,7 +813,7 @@ export function App() {
     CRAYON_CHARACTERS.find((c) => c.id === opponentCharId) || CRAYON_CHARACTERS[4];
   const activeOpponentPartnerChar =
     CRAYON_CHARACTERS.find((c) => c.id === opponentPartnerCharId) || CRAYON_CHARACTERS[1];
-  const matchRoom = customMatchRoom?.code === mpRoom?.code && ['PLAYING', 'PAUSED', 'GAME_OVER'].includes(gameState) ? customMatchRoom : null;
+  const matchRoom = activeMatchRoom(customMatchRoom, mpRoom, gameState, gameMode);
   const matchCharacters = useMemo(() => {
     const slots = matchRoom?.slots || [];
     const me = slots.find(slot => slot.playerId === multiplayerClient.playerId);
@@ -939,6 +825,8 @@ export function App() {
     COURT_THEMES.find((t) => t.id === selectedThemeId) || COURT_THEMES[0];
   const [autoVolleyballMap, setAutoVolleyballMap] = useState(() => { try { return localStorage.getItem('sixzun-auto-court') !== 'off'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('sixzun-auto-court', autoVolleyballMap ? 'on' : 'off'); } catch {} }, [autoVolleyballMap]);
+  const [autoGunMap, setAutoGunMap] = useState(() => { try { return localStorage.getItem('bonkup-auto-gun-map') !== 'off'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('bonkup-auto-gun-map', autoGunMap ? 'on' : 'off'); } catch {} }, [autoGunMap]);
   const activeRushMap =
     OBSTACLE_RUSH_MAPS.find((m) => m.id === selectedRushMapId) ||
     OBSTACLE_RUSH_MAPS[0];
@@ -966,10 +854,10 @@ export function App() {
     let previousRoomStatus = multiplayerClient.currentRoom?.status;
     const unsubState = multiplayerClient.subscribe(() => {
       const status = multiplayerClient.currentRoom?.status;
-      if (previousRoomStatus === 'PLAYING' && status === 'LOBBY') {
+      if (customMatchRoomRef.current && previousRoomStatus === 'PLAYING' && status === 'LOBBY') {
         setGameState('CUSTOM_LOBBY');
         setMatchTransition(null);
-      } else if (previousRoomStatus === 'PLAYING' && !status) {
+      } else if (customMatchRoomRef.current && previousRoomStatus === 'PLAYING' && !status) {
         setGameState('TITLE_MENU');
         setMatchTransition(null);
       }
@@ -985,6 +873,8 @@ export function App() {
     });
 
     const unsubMatchStart = multiplayerClient.onMatchStart((room) => {
+      if (gameStateRef.current !== 'CUSTOM_LOBBY' && customMatchRoomRef.current?.code !== room.code) return;
+      customMatchRoomRef.current = room;
       crayonAudio.playMenuClick();
       setCustomMatchRoom({ ...room, slots: room.slots.map(slot => ({ ...slot })) });
       if (isVolleyballMode(room.mode)) {
@@ -1345,6 +1235,9 @@ export function App() {
   const handleStartMatch = (overrideMode?: GameMode) => {
     crayonAudio.playMenuClick();
     const nextMode = overrideMode || gameMode;
+    customMatchRoomRef.current = null; setCustomMatchRoom(null);
+    if (multiplayerClient.currentRoom) void multiplayerClient.leaveCustomRoom();
+    if (nextMode === 'obstacle_rush' && autoGunMap) setSelectedRushMapId(nextRandomMap(OBSTACLE_RUSH_MAPS, selectedRushMapId).id);
     if (overrideMode) setGameMode(overrideMode);
     if (autoVolleyballMap && nextMode !== 'obstacle_rush' && nextMode !== 'floor_is_lava' && nextMode !== 'tour') {
       const themes = COURT_THEMES.slice(0, 6).filter(theme => theme.id !== selectedThemeId);
@@ -1362,11 +1255,12 @@ export function App() {
 
   const handleRestartMatch = () => {
     crayonAudio.playMenuClick();
-    if (multiplayerClient.currentRoom) {
+    if (matchRoom) {
       void multiplayerClient.returnToLobby();
       setGameState('CUSTOM_LOBBY');
       return;
     }
+    if (gameMode === 'obstacle_rush' && autoGunMap) setSelectedRushMapId(nextRandomMap(OBSTACLE_RUSH_MAPS, selectedRushMapId).id);
     if (autoVolleyballMap && gameMode !== 'obstacle_rush' && gameMode !== 'floor_is_lava' && gameMode !== 'tour') {
       const themes = COURT_THEMES.slice(0, 6).filter(theme => theme.id !== selectedThemeId);
       setSelectedThemeId(themes[Math.floor(Math.random() * themes.length)].id);
@@ -1379,14 +1273,14 @@ export function App() {
 
   const handleResultExit = async () => {
     crayonAudio.playMenuClick();
-    if (multiplayerClient.currentRoom) {
+    if (matchRoom) {
       if (leavingResultRoom) return;
       setLeavingResultRoom(true);
       try {
         if (!await multiplayerClient.leaveCustomRoom()) return;
       } finally { setLeavingResultRoom(false); }
     }
-    setCustomMatchRoom(null);
+    customMatchRoomRef.current = null; setCustomMatchRoom(null);
     setGameState('TITLE_MENU');
   };
 
@@ -1477,12 +1371,12 @@ export function App() {
       {['TITLE_MENU', 'PROFILE', 'CHARACTER_SELECT', 'SETTINGS', 'MODE_SELECT', 'CUSTOM_LOBBY', 'GAME_OVER'].includes(gameState) ? null : gameMode === 'obstacle_rush' &&
       (gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'GAME_OVER') ? (
         <ObstacleRushCanvas
-          key={`${rushRunKey}_${selectedRushMapId}_${rushTimerMinutes}_${mpRoom?.code || 'solo'}`}
+          key={`${rushRunKey}_${selectedRushMapId}_${rushTimerMinutes}_${matchRoom?.code || 'solo'}`}
           gameState={canvasGameState}
           playerChar={matchCharacters.player}
           playerDisplayName={playerName}
           customSlots={matchRoom?.mode === 'obstacle_rush' ? matchRoom.slots : undefined}
-          maxCustomPlayers={mpRoom?.mode === 'obstacle_rush' ? mpRoom.maxPlayers : 4}
+          maxCustomPlayers={matchRoom?.mode === 'obstacle_rush' ? matchRoom.maxPlayers : 4}
           rushMap={activeRushMap}
           difficulty={difficulty}
           cameraPreset={cameraPreset}
@@ -1499,11 +1393,12 @@ export function App() {
       ) : gameMode === 'floor_is_lava' &&
         (gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'GAME_OVER') ? (
         <FloorIsLavaCanvas
-          key={`${rushRunKey}_${selectedLavaMapId}_${difficulty}_${rushTimerMinutes}_${mpRoom?.code || 'solo'}`}
+          key={`${rushRunKey}_${selectedLavaMapId}_${difficulty}_${rushTimerMinutes}_${matchRoom?.code || 'solo'}`}
           gameState={canvasGameState}
           playerCharacter={matchCharacters.player}
           playerDisplayName={playerName}
           customSlots={matchRoom?.mode === 'floor_is_lava' ? matchRoom.slots : undefined}
+          actionTriggerRef={actionTriggerRef}
           aiDifficulty={difficulty}
           cameraPreset={cameraPreset}
           lavaMapId={selectedLavaMapId}
@@ -1547,6 +1442,7 @@ export function App() {
         />
       ) : (
         <VolleyballCanvas
+          customMatch={Boolean(matchRoom)}
           gameState={canvasGameState}
           gameMode={
             gameState === 'PLAYING' || gameState === 'PAUSED'
@@ -1619,19 +1515,12 @@ export function App() {
         </div>
       )}
 
-      {/* Full-Screen Tap-Only Very-Low-Opacity Joystick + Double-Tap Jump Layer for Gun Fight (Native 1:1 Screen Coordinates) */}
-      {!isPortrait && gameState === 'PLAYING' && gameMode === 'obstacle_rush' && (
-        <div
-          onPointerDown={handleInvisibleJoyDown}
-          onPointerMove={handleInvisibleJoyMove}
-          onPointerUp={handleInvisibleJoyEnd}
-          onPointerCancel={handleInvisibleJoyEnd}
-          onLostPointerCapture={handleInvisibleJoyEnd}
-          onContextMenu={event => event.preventDefault()}
-          className="fixed inset-0 z-[15] pointer-events-auto touch-none select-none"
-        >
-        </div>
-      )}
+      {canvasGameState === 'PLAYING' && <>
+        {gameMode === 'obstacle_rush' && <div className="fixed inset-0 z-[15] touch-none"
+          onPointerDown={event => { if (event.pointerType !== 'mouse') return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); if (event.button === 0) { actionTriggerRef.current.fireRequested = true; actionTriggerRef.current.firingHeld = true; } if (event.button === 2) actionTriggerRef.current.jumpRequested = true; }}
+          onPointerUp={() => { actionTriggerRef.current.firingHeld = false; }} onPointerCancel={resetTouchActions} onLostPointerCapture={() => { actionTriggerRef.current.firingHeld = false; }} onContextMenu={event => event.preventDefault()} />}
+        <TouchControls family={controlFamily} layouts={touchLayouts} actions={actionTriggerRef} />
+      </>}
 
       {/* ===================================================================== */}
       {/* PANEL 1: MAIN MENU (Non-Overlapping Responsive Layout for All Screens)*/}
@@ -2372,8 +2261,8 @@ export function App() {
               ? FLOOR_IS_LAVA_MAPS.map(map => ({ id: map.id, name: map.name, subtitle: map.environmentTag, preview: <LavaMapThumbnailPreview lavaMap={map} /> }))
               : modeAvailableThemes.slice(0, 6).map(map => ({ id: map.id, name: map.name, subtitle: '', preview: <MapThumbnailPreview theme={map} /> }))}
           selectedMap={gameMode === 'obstacle_rush' ? selectedRushMapId : gameMode === 'floor_is_lava' ? selectedLavaMapId : selectedThemeId}
-          autoMap={gameMode !== 'obstacle_rush' && gameMode !== 'floor_is_lava' && autoVolleyballMap}
-          onAutoMap={setAutoVolleyballMap}
+          autoMap={gameMode === 'obstacle_rush' ? autoGunMap : gameMode !== 'floor_is_lava' && autoVolleyballMap}
+          onAutoMap={gameMode === 'obstacle_rush' ? setAutoGunMap : gameMode === 'floor_is_lava' ? undefined : setAutoVolleyballMap}
           onMode={id => {
             const mode = SUB_GAMES_LIST.find(item => item.id === id);
             if (!mode) return;
@@ -2384,7 +2273,7 @@ export function App() {
           }}
           onMap={id => {
             crayonAudio.playMenuClick();
-            if (gameMode === 'obstacle_rush') { const map = OBSTACLE_RUSH_MAPS.find(map => map.id === id); if (map) setSelectedRushMapId(map.id); }
+            if (gameMode === 'obstacle_rush') { const map = OBSTACLE_RUSH_MAPS.find(map => map.id === id); if (map) { setAutoGunMap(false); setSelectedRushMapId(map.id); } }
             else if (gameMode === 'floor_is_lava') { const map = FLOOR_IS_LAVA_MAPS.find(map => map.id === id); if (map) setSelectedLavaMapId(map.id); }
             else { const map = COURT_THEMES.find(map => map.id === id); if (map) { setAutoVolleyballMap(false); setSelectedThemeId(map.id); } }
           }}
@@ -2570,7 +2459,7 @@ export function App() {
         <PausePanel
           mapName={gameMode === 'obstacle_rush' ? activeRushMap.name : gameMode === 'floor_is_lava' ? activeLavaMap.name : activeTheme.name}
           onResume={() => { crayonAudio.playMenuClick(); setGameState('PLAYING'); }}
-          onMenu={() => { crayonAudio.playMenuClick(); setGameState('TITLE_MENU'); }}
+          onMenu={() => void handleResultExit()}
           onControls={() => setReplayControls(true)}
         />
       )}
@@ -2579,6 +2468,7 @@ export function App() {
 
       {gameState === 'SETTINGS' && (
         <GameSettings mode={gameMode} initialTab={settingsTab}
+          controlsPanel={<TouchControlsEditor layouts={touchLayouts} onChange={setTouchLayouts} />}
           onControls={() => setReplayControls(true)}
           values={{ matchFormat, winScore, duration: rushTimerMinutes, difficulty, tempo: gameSpeedMultiplier, modifier: activeModifier, fov: cameraFov, landingRing: landingCircleStyle, vfx: enableVfx, shake: enableScreenShake, callouts: showCallouts, muted, music: musicVol, sfx: sfxVol }}
           onChange={handleSettingsChange}
@@ -2599,7 +2489,7 @@ export function App() {
           playerPartner={gameMode !== 'obstacle_rush' && gameMode !== 'floor_is_lava' && is2v2Match ? { name: roomPartner?.playerName || activePartnerChar.name, portrait: <ChibiCharacterPortrait char={{ ...activePartnerChar, ...(roomPartner ? { outfitId: roomPartner.outfitId, faceId: roomPartner.faceId } : {}) }} size={32} /> } : undefined}
           opponentPartner={gameMode !== 'obstacle_rush' && gameMode !== 'floor_is_lava' && is2v2Match ? { name: roomRivals[1]?.playerName || activeOpponentPartnerChar.name, portrait: <ChibiCharacterPortrait char={{ ...activeOpponentPartnerChar, ...(roomRivals[1] ? { outfitId: roomRivals[1].outfitId, faceId: roomRivals[1].faceId } : {}) }} size={32} /> } : undefined}
           onRestart={handleRestartMatch}
-          roomCode={mpRoom?.code}
+          roomCode={matchRoom?.code}
           leaving={leavingResultRoom}
           onMenu={() => void handleResultExit()}
         />

@@ -1,3 +1,4 @@
+import type { TouchGameActions } from './touchControlLayout';
 import { createFramePacer } from '../three/framePacing';
 import { createWeather } from '../three/weather';
 import { remoteMovement } from '../network/playerControl';
@@ -98,6 +99,7 @@ export interface FloorIsLavaHudState {
 }
 
 interface FloorIsLavaCanvasProps {
+  actionTriggerRef?: React.MutableRefObject<TouchGameActions>;
   onPreview?: (image: string) => void;
   gameState: GameState;
   playerCharacter: CharacterConfig;
@@ -315,6 +317,7 @@ function lerpAngleShortest(a: number, b: number, t: number): number {
 }
 
 export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
+  actionTriggerRef,
   gameState,
   playerCharacter,
   onPreview,
@@ -1935,7 +1938,10 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
             if (keys['KeyW'] || keys['ArrowUp']) rawForward += 1;
             if (keys['KeyS'] || keys['ArrowDown']) rawForward -= 1;
 
-            if (joystickRef.current.active) {
+            if (actionTriggerRef?.current.joystickActive) {
+              rawRight += actionTriggerRef.current.joystickX || 0;
+              rawForward -= actionTriggerRef.current.joystickY || 0;
+            } else if (joystickRef.current.active) {
               rawRight += joystickRef.current.x;
               rawForward -= joystickRef.current.y;
             }
@@ -1976,15 +1982,18 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
               }
             }
 
-            if (rightActionQueuedRef.current) {
+            if (rightActionQueuedRef.current || actionTriggerRef?.current.throwRequested) {
+              if (actionTriggerRef) actionTriggerRef.current.throwRequested = false;
               wantsAction = true;
               rightActionQueuedRef.current = false;
             }
-            if (dodgeQueuedRef.current) {
+            if (dodgeQueuedRef.current || actionTriggerRef?.current.dodgeRequested) {
+              if (actionTriggerRef) actionTriggerRef.current.dodgeRequested = false;
               wantsDodge = true;
               dodgeQueuedRef.current = false;
             }
-            if (jumpQueuedRef.current) {
+            if (jumpQueuedRef.current || actionTriggerRef?.current.jumpRequested) {
+              if (actionTriggerRef) actionTriggerRef.current.jumpRequested = false;
               wantsJump = true;
               jumpQueuedRef.current = false;
             }
@@ -3097,8 +3106,8 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
   // - Nearby loose balls are picked up automatically; no hold gesture is needed.
   // - Drag Right Side of Screen (or Move Mouse) = Rotate 3D Camera & Aim Crosshair!
   // - Tap Right Side / Left-Click = Throw along Crosshair with Aim Assist!
-  // - Double-Tap / Right-Click = Dodge
-  // - Left Half = Floating Movement Joystick
+  // - Visible Dodge button / Right-Click = Dodge
+  // - Visible left joystick = Movement
   // ===========================================================================
   const handleTouchAreaDown = (e: React.PointerEvent<HTMLDivElement>) => {
     screenHeldRef.current = true;
@@ -3140,19 +3149,7 @@ export const FloorIsLavaCanvas: React.FC<FloorIsLavaCanvasProps> = ({
       return;
     }
 
-    // Left Half Touch = Movement Joystick + Hold to Pick Ball!
-    if (joyPointerIdRef.current === null) {
-      joyPointerIdRef.current = e.pointerId;
-      joyOriginRef.current = { x: e.clientX, y: e.clientY };
-      e.currentTarget.setPointerCapture(e.pointerId);
-      joystickRef.current = { x: 0, y: 0, active: true };
-      if (joyContainerRef.current && joyKnobRef.current) {
-        joyContainerRef.current.style.display = 'flex';
-        joyContainerRef.current.style.left = `${e.clientX}px`;
-        joyContainerRef.current.style.top = `${e.clientY}px`;
-        joyKnobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
-      }
-    }
+    // Movement comes from the visible joystick; left-screen taps have no action.
   };
 
   const handleTouchAreaMove = (e: React.PointerEvent<HTMLDivElement>) => {

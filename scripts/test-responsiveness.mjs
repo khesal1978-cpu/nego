@@ -159,7 +159,7 @@ for (let players = 2; players <= 5; players++) {
   for (let round = 1; round < players; round++) assert.equal(m.nukeRoundSurvivors(players, round), players - round);
 }
 assert(m.gunFireRequested(true, false, false, true), 'A press and release between frames still fires');
-assert(m.gunFireRequested(true, false, false, false), 'Custom players auto-fire at visible targets');
+assert(!m.gunFireRequested(true, false, false, false), 'Custom players require manual fire even at visible targets');
 assert(!m.gunFireRequested(true, false, false, false, false), 'No idle shots without a target');
 
 // Host combat updates leave on this frame, then replicas reject late/duplicate

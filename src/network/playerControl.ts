@@ -15,7 +15,6 @@ export function remoteMovement(playerId: string | null, lastTick: number | undef
   return lastTick !== undefined && lastTick > 0 && now >= lastTick && now - lastTick < 500 ? { x: vx / speed, z: vz / speed } : { x: 0, z: 0 };
 }
 
-export function gunFireRequested(_custom: boolean, held: boolean | undefined, keyboard: boolean | undefined, pressed = false, targetAcquired = true) {
-  // Both solo and custom players auto-fire at acquired targets. Manual shots also work without a target.
-  return targetAcquired || held === true || keyboard === true || pressed;
+export function gunFireRequested(_custom: boolean, held: boolean | undefined, keyboard: boolean | undefined, pressed = false, _targetAcquired = true) {
+  return held === true || keyboard === true || pressed;
 }

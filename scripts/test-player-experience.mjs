@@ -53,12 +53,12 @@ assert.deepEqual(m.remoteMovement('human', 1000, 1500, 4, 3, 8), { x: 0, z: 0 },
 assert.deepEqual(m.remoteMovement('human', 2000, 1100, 4, 3, 8), { x: 0, z: 0 });
 assert.deepEqual(m.remoteMovement('human', 9000, 9100, -4, 0, 8), { x: -.5, z: 0 }, 'Reconnected human resumes from their own packet');
 for (const held of [false, undefined]) for (const keyboard of [false, undefined]) {
-  assert(m.gunFireRequested(true, held, keyboard), 'Custom player auto-fires when a target is acquired');
+  assert(!m.gunFireRequested(true, held, keyboard), 'Seeing a target never fires without player input');
   assert(!m.gunFireRequested(true, held, keyboard, false, false), 'No blind auto-fire without a target');
 }
 assert(m.gunFireRequested(true, true, false), 'Pointer fires');
 assert(m.gunFireRequested(true, false, true), 'Keyboard fires');
-assert(m.gunFireRequested(false, false, false), 'Existing solo assistance is preserved');
+assert(!m.gunFireRequested(false, false, false), 'Solo play also requires manual fire');
 const room = { mode: 'volleyball_2v2', status: 'PLAYING', slots: [{ playerId: 'me', team: 'blue', occupiedBy: 'human' }, { playerId: 'friend', team: 'blue', occupiedBy: 'human' }, { playerId: 'rival', team: 'red', occupiedBy: 'human' }, { playerId: null, team: 'red', occupiedBy: 'bot' }] };
 assert.deepEqual(m.volleyballControl(room, 'me'), { custom: true, partnerBot: false, rival1Bot: false, rival2Bot: true });
 const swappedRoom = { ...room, slots: room.slots.map(slot => ({ ...slot, team: slot.team === 'blue' ? 'red' : 'blue' })) };

@@ -1,3 +1,5 @@
+import type { TouchGameActions } from './touchControlLayout';
+import { volleyballAiFlight } from './volleyballShot';
 import { createFramePacer } from '../three/framePacing';
 import { createWeather } from '../three/weather';
 import { volleyballControl } from '../network/playerControl';
@@ -58,6 +60,7 @@ const _dummyParticle = new THREE.Object3D();
 const _tempColor = new THREE.Color();
 
 export interface VolleyballCanvasProps {
+  customMatch?: boolean;
   onPreview?: (image: string) => void;
   playerChar: CharacterConfig;
   partnerChar: CharacterConfig;
@@ -74,12 +77,7 @@ export interface VolleyballCanvasProps {
   matchId?: number;
   ballSkinSetting?: BallSkinId | 'auto';
   onActiveBallSkinChange?: (skin: BallSkinConfig) => void;
-  actionTriggerRef: React.MutableRefObject<{
-    spikeRequested: boolean;
-    diveRequested: boolean;
-    superRequested: boolean;
-    liftRequested?: boolean;
-  }>;
+  actionTriggerRef: React.MutableRefObject<TouchGameActions>;
   onRallyUpdate: (
     newRally: number,
     isSweetSpot: boolean,
@@ -120,6 +118,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
   partnerChar,
   aiChar1,
   aiChar2,
+  customMatch = false,
   is2v2,
   theme,
   gameMode,
@@ -152,6 +151,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
     partnerChar,
     aiChar1,
     aiChar2,
+    customMatch,
     is2v2,
     theme,
     gameMode,
@@ -180,6 +180,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       partnerChar,
       aiChar1,
       aiChar2,
+      customMatch,
       is2v2,
       theme,
       gameMode,
@@ -220,6 +221,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
     partnerChar.id,
     aiChar1.id,
     aiChar2.id,
+    customMatch,
     is2v2,
     theme.id,
     modifier,
@@ -675,7 +677,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
     const getGravity = () =>
       propsRef.current.modifier === 'low_gravity' ? -10.4 : BASE_GRAVITY;
 
-    const matchSync = createMatchSync(['volleyball_1v1', 'volleyball_2v2'], !onPreview);
+    const matchSync = createMatchSync(['volleyball_1v1', 'volleyball_2v2'], !onPreview && customMatch);
     const hitSync = createVolleyHitSync();
     const networkTiming = createVolleyTiming(multiplayerClient.playerId, (kind, payload) => multiplayerClient.sendGameEvent(kind, payload));
     const myTeam = () => multiplayerClient.currentRoom?.slots.find(s => s.playerId === multiplayerClient.playerId)?.team || 'blue';
@@ -809,7 +811,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       const modSpeed = propsRef.current.modifier === 'turbo' ? 0.84 : 1.0;
       // Progressive Rally Tension: Long rallies get slightly brisker & more exciting!
       const rallyPace = Math.max(0.86, 1.0 - Math.max(0, gameData.rallyCount - 3) * 0.018);
-      const T = Math.max(0.54, flightDuration * modSpeed * rallyPace);
+      const requestedTime = Math.max(0.54, flightDuration * modSpeed * rallyPace);
 
       // Keep shots cleanly inside the playable court bounds (|x| <= 3.3, |z| <= 6.2)
       const clampedX = THREE.MathUtils.clamp(targetX, -3.25, 3.25);
@@ -819,6 +821,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           : THREE.MathUtils.clamp(targetZ, -5.95, -1.35);
 
       const targetY = volleyballBallRadius(propsRef.current.modifier === 'big_ball');
+      const T = hitter === 'ai' ? volleyballAiFlight(gameData.by, gameData.bz, clampedZ, requestedTime, grav, targetY) : requestedTime;
       gameData.bvx = (clampedX - gameData.bx) / T;
       gameData.bvz = (clampedZ - gameData.bz) / T;
       gameData.bvy = (targetY - gameData.by - 0.5 * grav * T * T) / T;
@@ -1316,7 +1319,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         }
 
         // If 2v2 and the ball is near the Teammate, command Teammate to immediately Set/Lift it!
-        if (propsRef.current.is2v2 && volleyballControl(multiplayerClient.currentRoom, multiplayerClient.playerId).partnerBot) {
+        if (propsRef.current.is2v2 && volleyballControl(propsRef.current.customMatch ? multiplayerClient.currentRoom : null, multiplayerClient.playerId).partnerBot) {
           const distPartner = Math.hypot(
             gameData.bx - gameData.ptx,
             gameData.bz - gameData.ptz
@@ -1474,13 +1477,14 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
 
     const onPointerDown = (e: PointerEvent) => {
       if (propsRef.current.gameState !== 'PLAYING') return;
+      if (e.pointerType !== 'mouse' && e.clientX < window.innerWidth / 2) return;
       renderer.domElement.setPointerCapture(e.pointerId);
       const rect = renderer.domElement.getBoundingClientRect();
       const localX = e.clientX - rect.left;
       const localY = e.clientY - rect.top;
 
       const isSecondFinger = leftTouchId !== null && e.pointerId !== leftTouchId;
-      const custom = volleyballControl(multiplayerClient.currentRoom, multiplayerClient.playerId).custom;
+      const custom = volleyballControl(propsRef.current.customMatch ? multiplayerClient.currentRoom : null, multiplayerClient.playerId).custom;
       const customAction = custom && (e.pointerType === 'mouse' || localX >= rect.width / 2);
       if (customAction || isSecondFinger || localX >= rect.width / 2 || e.pointerType === 'mouse') {
         actionTouches.set(e.pointerId, {
@@ -1559,9 +1563,11 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
           const direction = volleyballSwipeDirection(dx, dy, { x: m[0], z: m[2] }, { x: m[4], z: m[6] });
           if (direction) {
             swipeAim = { ...direction, until: performance.now() + 1000 };
-            triggerPlayerSpikeOrServe(false);
-            gameData.spikeIntentTimer = Math.max(gameData.spikeIntentTimer, .75);
-          } else if (action.maxDrag < 14 && performance.now() - action.startTime < 360) {
+            if (e.pointerType === 'mouse') {
+              triggerPlayerSpikeOrServe(false);
+              gameData.spikeIntentTimer = Math.max(gameData.spikeIntentTimer, .75);
+            }
+          } else if (e.pointerType === 'mouse' && action.maxDrag < 14 && performance.now() - action.startTime < 360) {
             handleTapGesture(true);
           }
         } else swipeAim = null;
@@ -1571,7 +1577,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         const tapDuration = performance.now() - leftDownTimeMs;
 
         if (
-          !volleyballControl(multiplayerClient.currentRoom, multiplayerClient.playerId).custom &&
+          !volleyballControl(propsRef.current.customMatch ? multiplayerClient.currentRoom : null, multiplayerClient.playerId).custom &&
           e.type !== 'pointercancel' && !leftSwipedDown &&
           leftMaxDragDist < 14 &&
           tapDuration < 240 &&
@@ -1823,7 +1829,7 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
       const speedMult = propsRef.current.gameSpeedMultiplier ?? 1.0;
       const dt = Math.min(timer.getDelta(), 0.05) * speedMult;
       const elapsed = timer.getElapsed();
-      const control = volleyballControl(multiplayerClient.currentRoom, multiplayerClient.playerId);
+      const control = volleyballControl(propsRef.current.customMatch ? multiplayerClient.currentRoom : null, multiplayerClient.playerId);
       if (matchSync.active() && !matchSync.authority()) control.partnerBot = control.rival1Bot = control.rival2Bot = false;
 
       const {
@@ -1869,6 +1875,8 @@ export const VolleyballCanvas: React.FC<VolleyballCanvasProps> = ({
         camera.updateProjectionMatrix();
       }
 
+      // The visible joystick controls movement and the directional hit vector.
+      joystickVecRef.current = { x: actionTriggerRef.current.joystickX || 0, y: actionTriggerRef.current.joystickY || 0, active: Boolean(actionTriggerRef.current.joystickActive) };
       // Consume UI triggers (Super Badge, Spike, Dive, Call Lift)
       if (actionTriggerRef.current.superRequested) {
         actionTriggerRef.current.superRequested = false;

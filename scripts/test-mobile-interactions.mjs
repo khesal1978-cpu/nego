@@ -38,17 +38,18 @@ const nuke = load('src/components/nukeTouchControls.ts', {
 }).createNukeTouchActions(() => throws++, () => dodges++, () => nukeTime);
 const advanceNuke = ms => { nukeTime += ms; for (const [id, timer] of nukeTimers) if (timer.at <= nukeTime) { nukeTimers.delete(id); timer.callback(); } };
 const nukeTap = id => { nuke.start(pointer(id)); advanceNuke(40); nuke.end(pointer(id, { type: 'pointerup' })); };
-nukeTap(101); assert.equal(throws, 0); advanceNuke(240); assert.equal(throws, 1);
-nukeTap(102); advanceNuke(80); nukeTap(103); advanceNuke(400);
-assert.equal(dodges, 1); assert.equal(throws, 1, 'Double-tap never throws the held ball first');
-nukeTap(104); nuke.dodge(); advanceNuke(400);
-assert.equal(dodges, 2); assert.equal(throws, 1, 'Dodge button acts immediately and cancels pending throw');
-nukeTap(105); nuke.start(pointer(106)); nuke.move(pointer(106, { clientX: 810 })); nuke.end(pointer(106, { type: 'pointerup', clientX: 810 })); advanceNuke(400);
-assert.equal(throws, 1); assert.equal(dodges, 2, 'Aiming drag does not trigger a second tap');
-nukeTap(107); nuke.reset(); advanceNuke(400); assert.equal(throws, 1, 'Pause/unmount clears delayed actions');
+nukeTap(101); assert.equal(throws, 1, 'Single tap throws immediately without a delay');
+nukeTap(102); advanceNuke(80); nukeTap(103);
+assert.equal(dodges, 0); assert.equal(throws, 3, 'Repeated taps throw; dodge belongs to its button');
+nuke.dodge(); assert.equal(dodges, 1, 'Dodge button acts immediately');
+nuke.start(pointer(104)); nuke.move(pointer(104, { clientX: 810 })); nuke.end(pointer(104, { type: 'pointerup', clientX: 810 }));
+assert.equal(throws, 3, 'Aiming drag never throws');
+nuke.start(pointer(105)); nuke.reset(); nuke.end(pointer(105, { type: 'pointerup' })); assert.equal(throws, 3, 'Pause/unmount clears the active finger');
 nuke.start(pointer(108)); assert.equal(nuke.start(pointer(109)), false); nuke.end(pointer(108, { type: 'pointercancel' }));
-assert.equal(nukeTimers.size, 0);
-console.log('PASS: Nuke single throw, double-tap dodge without throwing, immediate dodge, drag/cancel and pause cleanup.');
+assert.equal(throws, 3); assert.equal(nukeTimers.size, 0);
+nuke.start(pointer(110)); advanceNuke(200); nuke.end(pointer(110, { type: 'pointerup', clientX: 760 }));
+assert.equal(throws, 4, 'A slightly shaky tap still throws');
+console.log('PASS: immediate Nuke taps, dedicated dodge, drag/cancel, finger ownership and pause cleanup.');
 
 const { characterSceneKey } = load('src/three/characterSceneKey.ts');
 const { CRAYON_CHARACTERS } = load('src/types/game.ts');
@@ -109,7 +110,7 @@ for (const webkit of [false, true]) {
 const fullscreen = mountFullscreen(true); assert(!fullscreen.visible); fullscreen.advance(10000); assert(!fullscreen.visible); fullscreen.unmount();
 const revealExit = mountFullscreen(true, true); await revealExit.tap(); assert(revealExit.visible && revealExit.exits === 0); await revealExit.tap(); assert.equal(revealExit.exits, 1, 'Second revealed tap toggles fullscreen'); revealExit.unmount();
 const gameplay = mountFullscreen(false, true); gameplay.advance(3500); assert(!gameplay.visible); await gameplay.tap(); assert(gameplay.visible && gameplay.requests === 0, 'First hidden normal corner tap only reveals'); await gameplay.tap(); assert.equal(gameplay.requests, 1); gameplay.unmount();
-console.log('PASS: Gun auto-fire touch actions, short double-tap jump, holds/drags/cancellation, stable appearance snapshots, standard/WebKit fullscreen, hold reveal, system exit and timer/listener cleanup.');
+console.log('PASS: legacy Gun gesture isolation, short double-tap jump, holds/drags/cancellation, stable appearance snapshots, standard/WebKit fullscreen, hold reveal, system exit and timer/listener cleanup.');
 const hungLock = mountFullscreen(false, false, false, { lock: () => new Promise(() => {}) });
 await hungLock.tap(); assert(!hungLock.button().props.disabled, 'Orientation-lock hang cannot disable fullscreen control');
 await hungLock.tap(); await hungLock.tap(); assert.equal(hungLock.exits, 1); hungLock.unmount();

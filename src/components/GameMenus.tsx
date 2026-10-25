@@ -4,7 +4,7 @@ import { DIFFICULTY_LEVELS, SUB_GAMES_LIST, type AIDifficulty, type GameMode, ty
 import './gameMenus.css';
 import { GameInfo } from './GameInfo';
 
-const SETTINGS_TABS = [{ id: 'gameplay', label: 'Gameplay' }, { id: 'camera', label: 'Camera & effects' }, { id: 'audio', label: 'Audio' }, { id: 'about', label: 'About' }] as const;
+const SETTINGS_TABS = [{ id: 'gameplay', label: 'Gameplay' }, { id: 'controls', label: 'Controls' }, { id: 'camera', label: 'Camera & effects' }, { id: 'audio', label: 'Audio' }, { id: 'about', label: 'About' }] as const;
 
 function MenuHeader({ title, description, onBack }: { title: string; description: string; onBack: () => void }) {
   return <header className="menu-header"><button className="menu-icon-button" onClick={onBack} aria-label="Back to main menu"><ArrowLeft size={20} /></button><div><h1>{title}</h1><p>{description}</p></div></header>;
@@ -39,8 +39,8 @@ export interface SettingsValues {
   sfx: number;
 }
 
-export function GameSettings({ mode, values: v, onChange, onBack, onReset, onControls, initialTab = 'gameplay' }: { mode: GameMode; values: SettingsValues; onChange: (values: Partial<SettingsValues>) => void; onBack: () => void; onReset: () => void; onControls?: () => void; initialTab?: 'gameplay' | 'camera' | 'audio' }) {
-  const [tab, setTab] = useState<'gameplay' | 'camera' | 'audio' | 'about'>(initialTab);
+export function GameSettings({ mode, values: v, onChange, onBack, onReset, onControls, controlsPanel, initialTab = 'gameplay' }: { mode: GameMode; values: SettingsValues; onChange: (values: Partial<SettingsValues>) => void; onBack: () => void; onReset: () => void; onControls?: () => void; controlsPanel?: React.ReactNode; initialTab?: 'gameplay' | 'camera' | 'audio' }) {
+  const [tab, setTab] = useState<'gameplay' | 'controls' | 'camera' | 'audio' | 'about'>(initialTab);
   const tabId = useId();
   const volleyball = mode !== 'obstacle_rush' && mode !== 'floor_is_lava';
   return <section className="game-menu settings-menu" aria-label="Game settings">
@@ -57,6 +57,7 @@ export function GameSettings({ mode, values: v, onChange, onBack, onReset, onCon
     <div className="menu-scroll">
       <div className="settings-content" role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-${tab}`}>
         {tab === 'about' && <GameInfo />}
+        {tab === 'controls' && controlsPanel}
         {tab === 'gameplay' && <>
           <div className="menu-section-heading"><h2>Match preferences</h2><p>These choices apply to your next match.</p></div>
           <div className="menu-settings-card">
@@ -124,14 +125,14 @@ export function ModesAndMaps(props: ModesProps) {
     <div className="modes-layout">
       <nav className="mode-list" aria-label="Game modes">{SUB_GAMES_LIST.filter(mode => mode.id !== 'survival' && mode.id !== 'hoop_volley').map(mode => <button key={mode.id} aria-pressed={props.mode === mode.id} onClick={() => props.onMode(mode.id)}><span>{mode.tabLabel}</span><ChevronRight size={16} /></button>)}</nav>
       <div className="map-selection">
-        <div className="menu-section-heading map-heading"><div><h2>{modeInfo?.tabLabel ?? 'Choose an arena'}</h2><p>{timed ? 'Pick the setting for your next match.' : props.autoMap ? 'A random court every match.' : 'Choose a court for your next rally.'}</p></div>{!timed && props.onAutoMap && <button className="map-auto-toggle" aria-pressed={props.autoMap} onClick={() => props.onAutoMap?.(!props.autoMap)}>Auto <span>{props.autoMap ? 'On' : 'Off'}</span></button>}</div>
+        <div className="menu-section-heading map-heading"><div><h2>{modeInfo?.tabLabel ?? 'Choose an arena'}</h2><p>{props.autoMap ? timed ? 'A random arena every match.' : 'A random court every match.' : timed ? 'Pick the setting for your next match.' : 'Choose a court for your next rally.'}</p></div>{props.onAutoMap && <button className="map-auto-toggle" aria-pressed={props.autoMap} onClick={() => props.onAutoMap?.(!props.autoMap)}>Auto <span>{props.autoMap ? 'On' : 'Off'}</span></button>}</div>
         <div className="map-grid">{props.maps.map(item => <button className="menu-map-card" key={item.id} aria-pressed={!props.autoMap && props.selectedMap === item.id} onClick={() => props.onMap(item.id)}>
           <div className="menu-map-image">{item.preview}</div>
-          <div className="menu-map-caption"><div><h3>{item.name}</h3><p>{item.subtitle}</p></div><span className="menu-map-check">{props.selectedMap === item.id && <Check size={14} />}</span></div>
+          <div className="menu-map-caption"><div><h3>{item.name}</h3><p>{item.subtitle}</p></div><span className="menu-map-check">{!props.autoMap && props.selectedMap === item.id && <Check size={14} />}</span></div>
         </button>)}</div>
       </div>
       <aside className="match-setup" aria-label="Match setup">
-        <div className="menu-section-heading"><h2>Your match</h2><p>{!timed && props.autoMap ? 'Random court' : map?.name ?? 'Select a map'}</p></div>
+        <div className="menu-section-heading"><h2>Your match</h2><p>{props.autoMap ? timed ? 'Random arena' : 'Random court' : map?.name ?? 'Select a map'}</p></div>
         <div className="match-setup-fields">
           {timed ? <div><h3>Match length</h3><Choices label="Match length" value={props.duration} options={([3, 5, 6] as const).map(value => ({ value, label: `${value} min` }))} onChange={props.onDuration} /></div> : <>
             <div><h3>Team size</h3><Choices label="Team size" value={props.matchFormat} options={[{ value: '1v1', label: '1 vs 1' }, { value: '2v2', label: '2 vs 2' }]} onChange={props.onFormat} /></div>
