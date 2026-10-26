@@ -191,10 +191,11 @@ const outlineMaterialCache = new Map<number, THREE.MeshBasicMaterial>();
 export function addCrayonOutline(
   mesh: THREE.Mesh,
   scaleMultiplier: number = 0.045,
-  outlineHex: number = 0x0f172a
+  outlineHex: number = 0x0f172a,
+  preserveNormals: boolean = false
 ): THREE.Mesh {
   const outlineGeo = mesh.geometry.clone();
-  outlineGeo.computeVertexNormals();
+  if (!preserveNormals) outlineGeo.computeVertexNormals();
 
   const posAttr = outlineGeo.getAttribute('position');
   const normAttr = outlineGeo.getAttribute('normal');

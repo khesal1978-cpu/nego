@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CharacterConfig } from '../types/game';
 import type { CharacterRig } from './crayonModels';
-import { addCrayonOutline, getContactShadowTexture, getToonGradientMap } from './crayonMaterials';
+import { addCrayonOutline, getContactShadowTexture } from './crayonMaterials';
 
 type AssetId = 'motu' | 'patlu';
 type Control = 'head' | 'leftArm' | 'rightArm' | 'leftFoot' | 'rightFoot';
@@ -14,7 +14,7 @@ export interface ImportedCharacterMetadata {
   bones: BoneData[];
   drivers: Record<Control, DriverData>;
   materials: { texture: string; opacity: number }[];
-  surfaces: { material: number; attributes: Record<'position' | 'normal' | 'uv' | 'skinWeight' | 'skinIndex' | 'index' | 'matchIndex', AttributeRange> }[];
+  surfaces: { material: number; attributes: Record<'position' | 'normal' | 'uv' | 'skinWeight' | 'skinIndex' | 'index' | 'matchIndex', AttributeRange>; matchAttributes?: Record<'position' | 'normal' | 'uv' | 'skinWeight' | 'skinIndex', AttributeRange> }[];
 }
 interface Asset { metadata: ImportedCharacterMetadata; data: ArrayBuffer; textures: THREE.Texture[] }
 const assets = new Map<AssetId, Asset>();
@@ -23,7 +23,7 @@ const controlNames: Record<Control, string> = { head: 'rig-head', leftArm: 'rig-
 
 export function installImportedCharacterAsset(metadata: ImportedCharacterMetadata, data: ArrayBuffer, textures: THREE.Texture[]) {
   if (metadata.schemaVersion !== 2 || !metadata.bones.length) throw new Error(`Invalid ${metadata.id} skeleton`);
-  for (const surface of metadata.surfaces) for (const range of Object.values(surface.attributes)) {
+  for (const surface of metadata.surfaces) for (const range of [...Object.values(surface.attributes), ...Object.values(surface.matchAttributes || {})]) {
     if (range.byteOffset % 4 || range.byteOffset + range.count * 4 > data.byteLength) throw new Error(`Invalid ${metadata.id} geometry`);
   }
   assets.set(metadata.id, { metadata, data, textures });
@@ -35,7 +35,7 @@ export function preloadImportedCharacters(): Promise<void> {
     if (assets.has(id)) return;
     const signal = AbortSignal.timeout(20000);
     const read = async (file: string) => {
-      const response = await fetch(`/characters/${file}?rig=2`, { signal });
+      const response = await fetch(`/characters/${file}?rig=3`, { signal });
       if (!response.ok) throw new Error(`Could not load ${id} (${response.status})`);
       return response;
     };
@@ -54,9 +54,51 @@ export function preloadImportedCharacters(): Promise<void> {
   return pending;
 }
 
-// Render loops update only matrices. Explicit bounds queries recompute the
-// deformed surface, so profile framing includes raised hands and skin movement.
+// A skin vertex is a convex blend of its bone transforms. Bounding each bone's
+// influenced vertices therefore encloses every pose without skinning the full
+// surface on the CPU for camera framing, render sorting and shadows.
+const boneBounds = new WeakMap<THREE.BufferGeometry, THREE.Box3[]>();
+let toonGradient: THREE.DataTexture | undefined;
+function importedToonGradient() {
+  if (!toonGradient) {
+    toonGradient = new THREE.DataTexture(new Uint8Array([150,150,150,255, 210,210,210,255, 255,255,255,255]), 3, 1, THREE.RGBAFormat);
+    toonGradient.minFilter = toonGradient.magFilter = THREE.NearestFilter;
+    toonGradient.generateMipmaps = false; toonGradient.needsUpdate = true;
+  }
+  return toonGradient;
+}
 class CharacterSkinMesh extends THREE.SkinnedMesh {
+  override computeBoundingBox() {
+    let bounds = boneBounds.get(this.geometry);
+    if (!bounds) {
+      bounds = this.skeleton.bones.map(() => new THREE.Box3());
+      const { position, skinIndex, skinWeight } = this.geometry.attributes;
+      const point = new THREE.Vector3(), local = new THREE.Vector3();
+      for (let vertex = 0; vertex < position.count; vertex++) {
+        point.fromBufferAttribute(position, vertex).applyMatrix4(this.bindMatrix);
+        for (let component = 0; component < 4; component++) {
+          if (skinWeight.getComponent(vertex, component) <= 0) continue;
+          const index = skinIndex.getComponent(vertex, component);
+          local.copy(point).applyMatrix4(this.skeleton.boneInverses[index]);
+          bounds[index].expandByPoint(local);
+        }
+      }
+      boneBounds.set(this.geometry, bounds);
+    }
+    this.boundingBox ??= new THREE.Box3();
+    this.boundingBox.makeEmpty();
+    const transform = new THREE.Matrix4(), box = new THREE.Box3();
+    bounds.forEach((bound, index) => {
+      if (bound.isEmpty()) return;
+      transform.multiplyMatrices(this.bindMatrixInverse, this.skeleton.bones[index].matrixWorld);
+      this.boundingBox!.union(box.copy(bound).applyMatrix4(transform));
+    });
+  }
+  override computeBoundingSphere() {
+    this.computeBoundingBox();
+    this.boundingSphere ??= new THREE.Sphere();
+    this.boundingBox!.getBoundingSphere(this.boundingSphere);
+  }
   override updateWorldMatrix(parents: boolean, children: boolean) {
     Object.assign(this, { boundingBox: null, boundingSphere: null });
     super.updateWorldMatrix(parents, children);
@@ -117,12 +159,16 @@ export function createImportedCharacter(config: CharacterConfig, anisotropy: num
   const skeleton = new THREE.Skeleton(bones); skeleton.calculateInverses();
   const materials = metadata.materials.map((material, index) => {
     asset.textures[index].anisotropy = anisotropy;
-    return new THREE.MeshToonMaterial({ map: asset.textures[index], gradientMap: getToonGradientMap(), side: THREE.DoubleSide, transparent: material.opacity < 1, opacity: material.opacity, depthWrite: material.opacity === 1 });
+    return new THREE.MeshToonMaterial({ map: asset.textures[index], gradientMap: importedToonGradient(), emissive: 0xffffff, emissiveMap: asset.textures[index], emissiveIntensity: .12, side: THREE.DoubleSide, transparent: material.opacity < 1, opacity: material.opacity, depthWrite: material.opacity === 1, forceSinglePass: true });
   });
   for (const surface of metadata.surfaces) {
     const geometry = new THREE.BufferGeometry();
+    const attributes = detail === 'match' ? surface.matchAttributes || surface.attributes : surface.attributes;
     for (const [name, size] of [['position',3], ['normal',3], ['uv',2], ['skinWeight',4], ['skinIndex',4]] as const) {
-      const range = surface.attributes[name], values = name === 'skinIndex' ? new Uint32Array(data, range.byteOffset, range.count) : new Float32Array(data, range.byteOffset, range.count);
+      // Three's shader declares skinIndex as vec4. Uint32 attributes use
+      // vertexAttribIPointer (integer input), which makes WebGL reject draws.
+      // Uint16 indices use the floating-point attribute binding the skin needs.
+      const range = attributes[name], values = name === 'skinIndex' ? Uint16Array.from(new Uint32Array(data, range.byteOffset, range.count)) : new Float32Array(data, range.byteOffset, range.count);
       geometry.setAttribute(name, new THREE.BufferAttribute(values, size));
     }
     const range = surface.attributes[detail === 'match' ? 'matchIndex' : 'index'];
@@ -130,7 +176,18 @@ export function createImportedCharacter(config: CharacterConfig, anisotropy: num
     const mesh = new CharacterSkinMesh(geometry, materials[surface.material]); mesh.name = `${config.name} continuous skin`;
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false; bodyGroup.add(mesh); mesh.bind(skeleton, new THREE.Matrix4());
     if (!materials[surface.material].transparent) {
-      const oldOutline = addCrayonOutline(mesh, .008); oldOutline.removeFromParent();
+      const oldOutline = addCrayonOutline(mesh, .012, 0x172033, true); oldOutline.removeFromParent();
+      // Strong body contours read at gameplay size; finer face contours leave
+      // room for glasses, eyebrows and the moustache instead of filling them in.
+      const sourcePosition = geometry.attributes.position, outlinePosition = oldOutline.geometry.attributes.position;
+      for (let vertex = 0; vertex < sourcePosition.count; vertex++) {
+        const face = THREE.MathUtils.smoothstep(sourcePosition.getY(vertex), metadata.drivers.head.pivot[1], metadata.drivers.head.pivot[1] + .08);
+        const thickness = 1 - face * .6;
+        for (let component = 0; component < 3; component++) {
+          const start = sourcePosition.getComponent(vertex, component);
+          outlinePosition.setComponent(vertex, component, start + (outlinePosition.getComponent(vertex, component) - start) * thickness);
+        }
+      }
       const outline = new CharacterSkinMesh(oldOutline.geometry, oldOutline.material); outline.name = `${config.name} skinned outline`;
       outline.frustumCulled = false; bodyGroup.add(outline); outline.bind(skeleton, new THREE.Matrix4());
     }

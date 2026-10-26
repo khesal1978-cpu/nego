@@ -277,7 +277,9 @@ for (const design of loading.LOADING_SCENES) {
 }
 for (const character of m.CRAYON_CHARACTERS) {
   const characterRig = m.createCrayonCharacter(character);
-  const bounds = new THREE.Box3().setFromObject(characterRig.root.getObjectByName('Uniform character size'));
+  // Exact floor/height checks use the skin itself; fast render bounds are
+  // deliberately conservative across bone influences.
+  const bounds = new THREE.Box3().setFromObject(characterRig.root.getObjectByName('Uniform character size'), Boolean(character.modelAsset));
   assert(Math.abs(bounds.min.y) < 1e-6, 'Every character stands on the same floor');
   assert(Math.abs(bounds.max.y - m.CHARACTER_MODEL_HEIGHT) < 1e-6, `${character.name} must have the shared standing height`);
   m.disposeSceneGeometry(new THREE.Scene().add(characterRig.root));

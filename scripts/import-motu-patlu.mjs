@@ -12,6 +12,36 @@ globalThis.window = { URL };
 const manager = new THREE.LoadingManager();
 manager.addHandler(/.*/, { load: () => new THREE.Texture(), setPath() { return this; } });
 await MeshoptSimplifier.ready;
+function compactSurface(geometry, indices) {
+  const vertices = [...new Set(indices)], remap = new Map(vertices.map((vertex, index) => [vertex, index]));
+  const result = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(geometry.attributes)) {
+    const values = new Float32Array(vertices.length * attribute.itemSize);
+    vertices.forEach((vertex, index) => {
+      for (let component = 0; component < attribute.itemSize; component++) values[index * attribute.itemSize + component] = attribute.getComponent(vertex, component);
+    });
+    result.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize));
+  }
+  result.setIndex(new THREE.BufferAttribute(Uint32Array.from(indices, vertex => remap.get(vertex)), 1));
+  // Smooth the reduced surface across coincident UV seams for rounded toon
+  // shading. Opposing faces stay separate instead of cancelling their normals.
+  result.computeVertexNormals();
+  const { position, normal } = result.attributes, buckets = new Map();
+  for (let vertex = 0; vertex < position.count; vertex++) {
+    const key = [position.getX(vertex), position.getY(vertex), position.getZ(vertex)].map(value => Math.round(value * 1e6)).join(',');
+    const bucket = buckets.get(key) || []; bucket.push(vertex); buckets.set(key, bucket);
+  }
+  const average = new THREE.Vector3(), current = new THREE.Vector3();
+  for (const vertices of buckets.values()) {
+    average.set(0, 0, 0);
+    for (const vertex of vertices) average.add(current.fromBufferAttribute(normal, vertex));
+    average.normalize();
+    for (const vertex of vertices) {
+      if (current.fromBufferAttribute(normal, vertex).dot(average) > .5) normal.setXYZ(vertex, average.x, average.y, average.z);
+    }
+  }
+  return result;
+}
 for (const [id, file, diffuse] of [['motu', 'Motu.fbx', 'motu/Motu_diff.png'], ['patlu', 'motu-patlu/source/Patlu_global_ctrl.fbx', 'motu-patlu/textures/Patlu_diff.png']]) {
   const old = JSON.parse(fs.readFileSync(path.join(output, `${id}.json`))), buffer = fs.readFileSync(path.join(source, file));
   const scene = new FBXLoader(manager).parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength), '');
@@ -62,16 +92,22 @@ for (const [id, file, diffuse] of [['motu', 'Motu.fbx', 'motu/Motu_diff.png'], [
     }
     const welded = mergeVertices(subset, 1e-6), index = new Uint32Array(welded.index.array), vertexCount = welded.attributes.position.count, values = new Float32Array(vertexCount * 13);
     for (let i = 0; i < vertexCount; i++) { let o = i * 13; for (const name of ['normal', 'uv', 'skinWeight', 'skinIndex']) for (let c = 0; c < welded.attributes[name].itemSize; c++) values[o++] = welded.attributes[name].getComponent(i, c); }
-    const matchIndex = MeshoptSimplifier.simplifyWithAttributes(index, welded.attributes.position.array, 3, values, 13, [.25,.25,.25,.5,.5,1,1,1,1,.02,.02,.02,.02], null, Math.floor(index.length * .6 / 3) * 3, .015, ['LockBorder'])[0];
-    const surface = { material: group.materialIndex, attributes: {} };
-    for (const name of ['position', 'normal', 'uv', 'skinWeight']) surface.attributes[name] = write(new Float32Array(welded.attributes[name].array));
-    surface.attributes.skinIndex = write(new Uint32Array(welded.attributes.skinIndex.array));
-    surface.attributes.index = write(index); surface.attributes.matchIndex = write(matchIndex); surfaces.push(surface);
+    const simplify = (input, ratio, error) => MeshoptSimplifier.simplifyWithAttributes(input, welded.attributes.position.array, 3, values, 13, [.25,.25,.25,.5,.5,1,1,1,1,.02,.02,.02,.02], null, Math.floor(index.length * ratio / 3) * 3, error, ['LockBorder'])[0];
+    const previewIndex = simplify(index, .45, .025), matchIndex = simplify(previewIndex, .2, .04);
+    const preview = compactSurface(welded, previewIndex), match = compactSurface(welded, matchIndex);
+    const writeAttributes = compact => {
+      const attributes = {};
+      for (const name of ['position', 'normal', 'uv', 'skinWeight']) attributes[name] = write(new Float32Array(compact.attributes[name].array));
+      attributes.skinIndex = write(new Uint32Array(compact.attributes.skinIndex.array));
+      return attributes;
+    };
+    const surface = { material: group.materialIndex, sourceTriangles: index.length / 3, attributes: writeAttributes(preview), matchAttributes: writeAttributes(match) };
+    surface.attributes.index = write(new Uint32Array(preview.index.array)); surface.attributes.matchIndex = write(new Uint32Array(match.index.array)); surfaces.push(surface);
   }
   const materials = old.materials;
   fs.copyFileSync(path.join(source, diffuse), path.join(output, materials[0].texture));
   if (id === 'patlu') fs.copyFileSync(path.join(source, 'motu-patlu/textures/PatluGlasses_diff.png'), path.join(output, materials[1].texture));
-  const metadata = { schemaVersion: 2, id, height: 1.4, bones, drivers, materials, surfaces, attribution: old.attribution, modifications: 'Full FBX skeleton and continuous skin weights retained; normalized size/orientation, game pose retargeting, lighter match indices. Supplied diffuse textures retained.' };
+  const metadata = { schemaVersion: 2, id, height: 1.4, bones, drivers, materials, surfaces, attribution: old.attribution, modifications: 'Full FBX skeleton and continuous skin weights retained; compact reduced preview/match surfaces, smoothed toon normals, normalized size/orientation and game pose retargeting. Supplied diffuse textures retained.' };
   fs.writeFileSync(path.join(output, `${id}.bin`), Buffer.concat(chunks)); fs.writeFileSync(path.join(output, `${id}.json`), JSON.stringify(metadata));
   console.log(`${id}: ${bones.length} bones; ${surfaces.length} continuous surfaces; ${surfaces.reduce((sum,s)=>sum+s.attributes.index.count/3,0)} preview triangles; ${surfaces.reduce((sum,s)=>sum+s.attributes.matchIndex.count/3,0)} match triangles; ${byteOffset} bytes`);
 }
