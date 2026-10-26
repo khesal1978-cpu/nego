@@ -1,6 +1,8 @@
 import { characterGeometry } from './characterGeometry';
 import { batchStaticScenery } from './scenePerformance';
 import { createCigarSmoke } from './cigarSmoke';
+import { createImportedCharacter } from './importedCharacters';
+export { installImportedCharacterAsset } from './importedCharacters';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -59,6 +61,7 @@ export function createCrayonCharacter(
   isLocalPlayer: boolean = false,
   detail: 'preview' | 'match' = 'preview'
 ): CharacterRig {
+  if (config.modelAsset) return createImportedCharacter(config, maxAnisotropy, facingZ, isLocalPlayer, detail);
   const geometry = characterGeometry(detail === 'match');
   const addCharacterOutline = (mesh: THREE.Mesh, thickness = .045, color?: number) => addCrayonOutline(mesh, thickness * .82, color);
   const root = new THREE.Group();

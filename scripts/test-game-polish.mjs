@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import { buildSync } from 'esbuild';
 import * as THREE from 'three';
 import React from 'react';
+import { installTestCharacterAssets } from './imported-character-test-assets.mjs';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 fs.mkdirSync('.npm-cache', { recursive: true });
 buildSync({ stdin: { contents: `export * from './src/three/combatFeedback'; export * from './src/three/characterRagdoll'; export * from './src/three/scenePerformance'; export * from './src/three/frameBudget'; export * from './src/three/menuEmotes'; export * from './src/three/characterPreviewFraming'; export * from './src/three/spawnShield'; export * from './src/three/crayonModels'; export * from './src/three/fortDetail'; export * from './src/components/nukeControls'; export * from './src/components/MatchPanels'; export * from './src/types/game';`, loader: 'ts', resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', packages: 'external', loader: { '.css': 'empty' }, outfile: '.npm-cache/game-polish-tests.mjs' });
 const m = await import('../.npm-cache/game-polish-tests.mjs');
+installTestCharacterAssets(m);
 
 for (const angle of [-2, -.4, 0, .4, 2]) {
   const aim = m.assistedNukeDirection(0, -1, Math.sin(Math.PI + angle), Math.cos(Math.PI + angle));

@@ -1945,10 +1945,10 @@ export const ObstacleRushCanvas: React.FC<ObstacleRushCanvasProps> = ({
       // MAKE CHARACTER SIZE BIGGER & HEROIC (1.38x Scale!)
       charGroup.scale.setScalar(1.38);
 
-      rig.rightArm.position.set(0.205, 0.815, 0.02);
+      if (!baseChar.modelAsset) rig.rightArm.position.set(0.205, 0.815, 0.02);
       rig.rightArm.rotation.set(-1.12, -0.22, -0.18);
 
-      rig.leftArm.position.set(-0.195, 0.815, 0.06);
+      if (!baseChar.modelAsset) rig.leftArm.position.set(-0.195, 0.815, 0.06);
       rig.leftArm.rotation.set(-1.18, 0.52, 0.25);
 
       const dressHex = isPlayer ? playerDressHex : dressOverride.primaryColor;

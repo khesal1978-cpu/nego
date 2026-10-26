@@ -13,6 +13,7 @@ export function CharacterPortrait({ char, outfitOverride, faceOverride, headShap
   const shape = headShapeOverride || char.headShape;
   const primary = outfitOverride || char.outfitId ? outfit.primaryColor : char.primaryColor;
   const gradient = (name: string) => `url(#${uid}-${name})`;
+  if (char.modelAsset) return <img src={`/characters/${char.modelAsset}-portrait.png`} width={size} height={size} alt={char.name} style={{ objectFit: 'contain' }} />;
   if (char.id === 'smokey_jester') return <svg width={size} height={size} viewBox="0 0 100 108" fill="none" role="img" aria-label={`${char.name}, spiky hair, dark jacket and smoking cigar`}>
     <defs><linearGradient id={`${uid}-skin`} x2="0" y2="1"><stop stopColor={char.skinTone} /><stop offset="1" stopColor="#A97A58" /></linearGradient><linearGradient id={`${uid}-jacket`} x2="1" y2="1"><stop stopColor="#414A52" /><stop offset="1" stopColor={primary} /></linearGradient></defs>
     <path d="M13 111 20 86 36 77H64L80 86 87 111" fill={gradient('jacket')} stroke={INK} strokeWidth="3" />

@@ -1,5 +1,7 @@
 # Bonk Up
 
+The roster includes Motu and Patlu from the supplied GLB models, with original clothing, expressions and textures. Select them in Customize; they work in Gun Fight, Volleyball, Nuke, and custom multiplayer. Their original appearance is fixed. Assets load once before scenes measure character bounds, with a retry screen for failed downloads. Match meshes use simplified index buffers while previews retain the full source surfaces. Model attribution is in Settings → About and `public/characters/ATTRIBUTION.md`.
+
 Requires Node.js 22 and npm. Run `npm ci`, then `npm run dev` (or double-click `start-preview.cmd` on Windows). Open the URL printed by the server. No AI API key is needed.
 
 `npm run lint` checks TypeScript; `npm run build` creates the production client in `dist`. Regression checks are the `test:*` commands in `package.json`.

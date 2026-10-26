@@ -3,8 +3,10 @@ import { buildSync } from 'esbuild';
 import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
 import * as THREE from 'three';
+import { installTestCharacterAssets } from './imported-character-test-assets.mjs';
 buildSync({ stdin: { contents: `export * from './src/three/crayonModels'; export * from './src/types/game'; export * from './src/three/framePacing'; export * from './src/three/postProcessing';`, loader: 'ts', resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', packages: 'external', outfile: '.npm-cache/low-end-test.mjs' });
 const m = await import('../.npm-cache/low-end-test.mjs');
+installTestCharacterAssets(m);
 globalThis.document = { createElement: () => ({ width: 256, height: 256, getContext: () => new Proxy({
   measureText: text => ({ width: String(text).length * 8 }),
   createLinearGradient: () => ({ addColorStop() {} }), createRadialGradient: () => ({ addColorStop() {} }),

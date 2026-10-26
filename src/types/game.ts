@@ -11,7 +11,9 @@ export type CharacterId =
   | 'burger_chef'
   | 'strawberry_kid'
   | 'pineapple_king'
-  | 'smokey_jester';
+  | 'smokey_jester'
+  | 'motu'
+  | 'patlu';
 
 export type HatStyle =
   | 'spiky_hair'
@@ -302,6 +304,7 @@ export interface EmoteConfig {
 }
 
 export interface CharacterConfig {
+  modelAsset?: 'motu' | 'patlu';
   id: CharacterId;
   name: string;
   title: string;
@@ -880,6 +883,20 @@ export const CRAYON_CHARACTERS: CharacterConfig[] = [
     hatStyle: 'spiky_hair', headShape: 'angular', defaultOutfit: 'street_leather', defaultFace: 'fierce_pro',
     speed: 3, floatiness: 3, power: 3, reach: 3,
     tagline: 'Spiked hair, a charcoal jacket and a smouldering cigar. Cool under pressure.', superMoveName: 'Midnight Curve Smash',
+  },
+  {
+    id: 'motu', modelAsset: 'motu', name: 'MOTU', title: 'Samosa Power', rarity: 'Epic', level: 12,
+    skinTone: '#EFC393', primaryColor: '#D9342C', secondaryColor: '#25202B', accentColor: '#EEC63D', cheekColor: '#D99175',
+    hatStyle: 'spiky_hair', headShape: 'mochi', defaultOutfit: 'crown_hoodie', defaultFace: 'happy_laugh',
+    speed: 3, floatiness: 3, power: 3, reach: 3,
+    tagline: 'Big heart, bigger appetite. Always ready for the next adventure.', superMoveName: 'Samosa Smash',
+  },
+  {
+    id: 'patlu', modelAsset: 'patlu', name: 'PATLU', title: 'The Clever Teammate', rarity: 'Epic', level: 12,
+    skinTone: '#EFC393', primaryColor: '#EABB27', secondaryColor: '#CB5428', accentColor: '#25202B', cheekColor: '#D99175',
+    hatStyle: 'shades', headShape: 'bean', defaultOutfit: 'beach_jersey', defaultFace: 'cool_shades',
+    speed: 3, floatiness: 3, power: 3, reach: 3,
+    tagline: 'A quick thinker with a plan for every match.', superMoveName: 'Brainstorm Spike',
   },
 ];
 

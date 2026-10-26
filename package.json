@@ -33,6 +33,7 @@
     "test:kill-notice": "node scripts/test-kill-notice.mjs",
     "test:custom-volleyball": "node scripts/test-custom-volleyball.mjs",
     "test:low-end": "node scripts/test-low-end.mjs",
+    "test:characters": "node scripts/test-imported-characters.mjs",
     "test:deployment": "node scripts/test-deployment.mjs",
     "test:vercel": "node scripts/test-vercel.mjs"
   },
