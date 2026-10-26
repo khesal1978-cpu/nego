@@ -79,10 +79,13 @@ export function batchStaticScenery(root: THREE.Group, animated: THREE.Object3D[]
 
 export function disposeSceneGeometry(scene: THREE.Object3D) {
   const geometry = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+  const skeletons = new Set<THREE.Skeleton>();
   scene.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return;
     geometry.add(object.geometry);
+    if (object instanceof THREE.SkinnedMesh) skeletons.add(object.skeleton);
     (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => materials.add(material));
   });
   geometry.forEach(value => value.dispose()); materials.forEach(value => { if (!value.userData.sharedCrayonResource) value.dispose(); });
+  skeletons.forEach(skeleton => skeleton.dispose());
 }

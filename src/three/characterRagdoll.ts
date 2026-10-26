@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { CharacterRig } from './crayonModels';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
 type Particle = { p: THREE.Vector3; previous: THREE.Vector3; radius: number };
 type Doll = { body: THREE.Group; particles: Particle[]; constraints: Array<[number, number, number]>; scale: number; yaw: THREE.Quaternion; life: number; parts: Array<THREE.Object3D | undefined> };
@@ -13,10 +14,16 @@ export function createCharacterRagdolls(scene: THREE.Scene, floorAt: (x: number,
   const delta = new THREE.Vector3(), axis = new THREE.Vector3(), local = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const orientation = new THREE.Quaternion(), inverse = new THREE.Quaternion();
   let accumulator = 0;
-  function clear() { for (const doll of dolls) doll.body.removeFromParent(); dolls.length = 0; }
+  function release(body: THREE.Group) {
+    body.removeFromParent();
+    const skeletons = new Set<THREE.Skeleton>();
+    body.traverse(object => { if (object instanceof THREE.SkinnedMesh) skeletons.add(object.skeleton); });
+    skeletons.forEach(skeleton => skeleton.dispose());
+  }
+  function clear() { for (const doll of dolls) release(doll.body); dolls.length = 0; }
   return {
     spawn(rig: CharacterRig, vx: number, vz: number) {
-      if (dolls.length >= 3) dolls.shift()!.body.removeFromParent();
+      if (dolls.length >= 3) release(dolls.shift()!.body);
       rig.root.updateWorldMatrix(true, true);
       // bodyGroup's world transform includes the shared model-size normalization.
       const scale = rig.bodyGroup.getWorldScale(new THREE.Vector3()).x;
@@ -30,7 +37,7 @@ export function createCharacterRagdolls(scene: THREE.Scene, floorAt: (x: number,
       });
       const pairs = [[0, 1], [1, 2], [1, 3], [1, 4], [0, 5], [0, 6], [3, 4], [5, 6], [0, 2]];
       const constraints = pairs.map(([a, b]) => [a, b, particles[a].p.distanceTo(particles[b].p)] as [number, number, number]);
-      const body = rig.bodyGroup.clone(true);
+      const body = (rig.bodyGroup.userData.skinnedCharacter ? cloneSkeleton(rig.bodyGroup) : rig.bodyGroup.clone(true)) as THREE.Group;
       body.traverse(object => { if (object.userData.excludeRagdoll) object.visible = false; });
       body.scale.copy(rig.bodyGroup.getWorldScale(new THREE.Vector3()));
       body.position.copy(origin); body.quaternion.copy(yaw); scene.add(body);
@@ -69,7 +76,7 @@ export function createCharacterRagdolls(scene: THREE.Scene, floorAt: (x: number,
       }
       for (let i = dolls.length - 1; i >= 0; i--) {
         const doll = dolls[i];
-        if (doll.life <= 0) { doll.body.removeFromParent(); dolls.splice(i, 1); continue; }
+        if (doll.life <= 0) { release(doll.body); dolls.splice(i, 1); continue; }
         const p = doll.particles;
         axis.subVectors(p[1].p, p[0].p).normalize();
         orientation.setFromUnitVectors(up, axis).multiply(doll.yaw);

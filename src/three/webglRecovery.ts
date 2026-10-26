@@ -7,6 +7,7 @@ export function refreshSceneResources(scene: THREE.Scene) {
   if (scene.environment) textures.add(scene.environment);
   scene.traverse(object => {
     if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line) {
+      if (object instanceof THREE.SkinnedMesh && object.skeleton.boneTexture) textures.add(object.skeleton.boneTexture);
       const list = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of list) {
         materials.add(material);

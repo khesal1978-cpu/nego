@@ -1,6 +1,6 @@
 # Bonk Up
 
-The roster includes Motu and Patlu from the supplied GLB models, with original clothing, expressions and textures. Select them in Customize; they work in Gun Fight, Volleyball, Nuke, and custom multiplayer. Their original appearance is fixed. Assets load once before scenes measure character bounds, with a retry screen for failed downloads. Match meshes use simplified index buffers while previews retain the full source surfaces. Model attribution is in Settings → About and `public/characters/ATTRIBUTION.md`.
+The roster includes Motu and Patlu from the supplied rigged FBX models, with original clothing, expressions and textures. Their complete skeletons and blended skin weights animate continuous surfaces at the shoulders, neck and hips. Resting arm angles leave the hands beside the belly and kurta, including the menu's idle tilt. Select them in Customize; they work in Gun Fight, Volleyball, Nuke, and custom multiplayer. Their original appearance is fixed. Assets load once before scenes measure character bounds, with a retry screen for failed downloads. Match meshes use simplified index buffers while previews retain the full source surfaces. Model attribution is in Settings → About and `public/characters/ATTRIBUTION.md`.
 
 Requires Node.js 22 and npm. Run `npm ci`, then `npm run dev` (or double-click `start-preview.cmd` on Windows). Open the URL printed by the server. No AI API key is needed.
 

@@ -14,7 +14,7 @@ globalThis.fetch = async () => ({ ok: false, status: 503 });
 await assert.rejects(m.preloadImportedCharacters(), /Could not load/);
 globalThis.fetch = async url => {
   requests++;
-  const buffer = fs.readFileSync(`public${url}`);
+  const buffer = fs.readFileSync(`public${url.split('?')[0]}`);
   return { ok: true, json: async () => JSON.parse(buffer), arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength), blob: async () => new Blob([buffer]) };
 };
 globalThis.createImageBitmap = async () => ({ width: 1024, height: 1024 });
@@ -38,12 +38,59 @@ for (const id of ['motu', 'patlu']) {
   assert(Math.abs(bounds.min.y) < 1e-5, 'Feet start on the floor');
   const left = preview.leftArm.getWorldPosition(new THREE.Vector3()), right = preview.rightArm.getWorldPosition(new THREE.Vector3());
   assert(left.x < right.x, 'Arm ordering follows game controls');
-  for (const name of ['headGroup', 'leftArm', 'rightArm', 'leftFoot', 'rightFoot']) assert(preview[name].children.length > 0, `${id} ${name} has actual source geometry`);
+  const skin = rig => { let mesh; rig.bodyGroup.traverse(o => { if (o.isSkinnedMesh && o.material.side !== THREE.BackSide) mesh ??= o; }); return mesh; };
+  const previewSkin = skin(preview), matchSkin = skin(match);
+  assert.equal(previewSkin.skeleton.bones.length, id === 'motu' ? 52 : 78, 'Original FBX skeleton remains intact');
+  assert.equal(metadata.surfaces.length, id === 'motu' ? 1 : 2, 'Body is a continuous source surface');
+  let blends = 0;
+  for (let i = 0; i < previewSkin.geometry.attributes.skinWeight.count; i++) {
+    const weights = previewSkin.geometry.attributes.skinWeight;
+    assert(Math.abs([0,1,2,3].reduce((sum,c)=>sum+weights.getComponent(i,c),0)-1) < 1e-5);
+    if (weights.getY(i) > .01) blends++;
+  }
+  assert(blends > 100, 'Skin retains blended influences around articulating joints');
+  // Measure the actual deformed hands against the clothing silhouette. The
+  // previous 90-degree resting pose buried them in the belly/kurta.
+  const handBones = new Set(), torsoBones = new Set();
+  previewSkin.skeleton.bones.forEach((bone, index) => {
+    if (/Hand$|wrist_bn$/.test(bone.name)) bone.traverse(child => handBones.add(previewSkin.skeleton.bones.indexOf(child)));
+    if (/Spine|Hips|^hip_bn$|^spine_bn$|^chest_bn$/.test(bone.name)) torsoBones.add(index);
+  });
+  const attributes = previewSkin.geometry.attributes;
+  const influencedBy = (vertex, bones) => [0,1,2,3].reduce((sum, component) => sum +
+    (bones.has(attributes.skinIndex.getComponent(vertex, component)) ? attributes.skinWeight.getComponent(vertex, component) : 0), 0) > .5;
+  for (const pose of [{ leftX: 0, rightX: 0, leftZ: 0, rightZ: 0 }, m.mainMenuIdlePose(0), m.menuEmotePose(0)]) {
+    preview.leftArm.rotation.set(pose.leftX, 0, pose.leftZ);
+    preview.rightArm.rotation.set(pose.rightX, 0, pose.rightZ);
+    preview.root.updateMatrixWorld(true);
+    const hands = [[], []], torso = [];
+    for (let vertex = 0; vertex < attributes.position.count; vertex++) {
+      const point = previewSkin.getVertexPosition(vertex, new THREE.Vector3()).applyMatrix4(previewSkin.matrixWorld);
+      if (influencedBy(vertex, handBones)) hands[point.x < 0 ? 0 : 1].push(point);
+      if (influencedBy(vertex, torsoBones)) torso.push(point);
+    }
+    for (const hand of hands) {
+      assert(hand.length > 100, 'Measure each complete weighted hand');
+      const handBounds = new THREE.Box3().setFromPoints(hand);
+      const clothingEdge = Math.max(...torso.filter(point => point.y >= handBounds.min.y - .08 && point.y <= handBounds.max.y + .08).map(point => Math.abs(point.x)));
+      assert(Number.isFinite(clothingEdge));
+      assert(Math.min(...hand.map(point => Math.abs(point.x))) > clothingEdge + .01, `${id}: standing hands clear the clothing, including the inward menu tilt`);
+    }
+  }
+  preview.leftArm.rotation.set(0, 0, 0); preview.rightArm.rotation.set(0, 0, 0); preview.root.updateMatrixWorld(true);
+  const deformedBefore = Array.from({length: previewSkin.geometry.attributes.position.count},(_,i)=>previewSkin.getVertexPosition(i,new THREE.Vector3()).toArray());
+  preview.rightArm.rotation.x = -.8; preview.root.updateMatrixWorld(true);
+  const moved = deformedBefore.filter((p,i)=>new THREE.Vector3().fromArray(p).distanceTo(previewSkin.getVertexPosition(i,new THREE.Vector3())) > .001).length;
+  assert(moved > 100, 'Control moves the actual weighted skin, including joint transitions');
+  preview.rightArm.rotation.x = 0; preview.root.updateMatrixWorld(true);
   const count = rig => { let n = 0; rig.bodyGroup.traverse(o => { if (o.isMesh) n += o.geometry.index.count / 3; }); return n; };
   assert(count(match) < count(preview) * .85, 'Match geometry is lighter than full preview');
-  const sourcePosition = preview.headGroup.children[0].geometry.attributes.position.array.slice();
+  const sourcePosition = previewSkin.geometry.attributes.position.array.slice();
   const scene = new THREE.Scene(); scene.add(match.root);
   const ragdolls = m.createCharacterRagdolls(scene, () => 0); ragdolls.spawn(match, 4, 2);
+  const doll = scene.children.at(-1), dollSkin = skin({bodyGroup:doll});
+  assert.notEqual(dollSkin.skeleton, matchSkin.skeleton, 'Death pose owns an independent skeleton');
+  assert.notEqual(dollSkin.skeleton.bones[0], matchSkin.skeleton.bones[0]);
   for (let frame = 0; frame < 120; frame++) {
     m.animateMainMenuIdle(preview, frame / 60, 1 / 60, false, 0);
     match.rightArm.rotation.x = -2.2; match.leftFoot.rotation.x = Math.sin(frame / 10) * .4;
@@ -52,12 +99,12 @@ for (const id of ['motu', 'patlu']) {
     match.root.traverse(o => assert(o.matrixWorld.elements.every(Number.isFinite)));
   }
   ragdolls.dispose(); m.disposeSceneGeometry(scene);
-  assert.deepEqual(preview.headGroup.children[0].geometry.attributes.position.array, sourcePosition, 'Other rigs keep their original geometry after scene disposal');
+  assert.deepEqual(previewSkin.geometry.attributes.position.array, sourcePosition, 'Other rigs keep their original geometry after scene disposal');
   const image = renderToStaticMarkup(React.createElement(m.CharacterPortrait, { char: config }));
   assert(image.includes(`${id}-portrait.png`));
   const studio = renderToStaticMarkup(React.createElement(m.CharacterStudio, { character: config, selectedCharacter: id, outfit: config.defaultOutfit, face: config.defaultFace, head: config.headShape, portrait: c => React.createElement(m.CharacterPortrait, { char: c }), outfitPreview: () => null }));
   assert(studio.includes('Original clothing') && studio.includes('Original expression'));
   assert.equal((studio.match(/role="tab"/g) || []).length, 1, 'Fixed appearance exposes only the character picker');
-  console.log(`PASS: ${id} source geometry, 1.9-height/floor placement, independent animation/disposal, room/saved selection, portraits and fixed-appearance UI (${Math.round((1 - count(match) / count(preview)) * 100)}% fewer match triangles).`);
+  console.log(`PASS: ${id} continuous skin, standing hand clearance, 1.9-height/floor placement, independent animation/disposal, room/saved selection, portraits and fixed-appearance UI (${Math.round((1 - count(match) / count(preview)) * 100)}% fewer match triangles).`);
 }
 console.log('PASS: asset failure/retry, concurrent preload deduplication and decoded texture caching.');
